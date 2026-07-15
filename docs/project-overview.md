@@ -10,14 +10,14 @@
 
 產品承諾是「當偏移真的持續時才提醒，讓使用者看得到自己逐步改善」，不宣稱矯正脊椎、診斷疾病或取代醫療專業。
 
-`apps/client/` 與 `services/api/` 是保留的既有專案結構例外，也分別是 Expo 與 FastAPI 的 framework root；manifest 直接位於 component 根目錄。此架構不再增加 project-name／framework-name wrapper，後續新元件才依新版固定 component root 規則選擇路徑。
+`app/` 與 `backend/` 分別是 Expo 與 FastAPI 的固定 component root；manifest 直接位於 component 根目錄。此架構不增加 project-name、framework-name 或其他分類包層。
 
 ## 系統邊界
 
 | 邊界 | 責任 | 不負責 |
 |---|---|---|
-| `apps/client` | 相機權限、視角引導、校準、即時結果、提醒、工作階段與趨勢畫面 | 保存秘密、直接連 PostgreSQL、在前端呼叫具秘密的 AI API |
-| `services/api` | 接收暫存影格／節點、MediaPipe 推論、指標與規則、資料 API、AI provider | 永久保存原始影像、直接控制危險硬體 |
+| `app` | 相機權限、視角引導、校準、即時結果、提醒、工作階段與趨勢畫面 | 保存秘密、直接連 PostgreSQL、在前端呼叫具秘密的 AI API |
+| `backend` | 接收暫存影格／節點、MediaPipe 推論、指標與規則、資料 API、AI provider | 永久保存原始影像、直接控制危險硬體 |
 | PostgreSQL | 工作階段、摘要指標、提醒事件、使用者偏好與同意紀錄 | 原始影格、未經同意的聯絡人資料 |
 | Microsoft Foundry | 根據去識別摘要產生建議，形成 Azure 概念驗證 | 決定姿勢是否良好、做醫療診斷 |
 | Coolify | 部署 client、API 與 PostgreSQL | 取代 Azure 概念驗證或自動取得競賽所需額度 |

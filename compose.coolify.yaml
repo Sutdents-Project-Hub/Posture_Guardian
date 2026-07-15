@@ -18,7 +18,7 @@ services:
 
   api:
     build:
-      context: ./services/api
+      context: ./backend
     restart: unless-stopped
     environment:
       APP_ENV: production
@@ -36,7 +36,7 @@ services:
 
   web:
     build:
-      context: ./apps/client
+      context: ./app
       args:
         EXPO_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?Set PUBLIC_API_BASE_URL to the public HTTPS API URL}
     restart: unless-stopped

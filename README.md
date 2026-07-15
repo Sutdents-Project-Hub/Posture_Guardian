@@ -45,20 +45,20 @@
 
 | 路徑 | 責任 | 已驗證技術 |
 |---|---|---|
-| `apps/client` | Android、iOS 與響應式 Web 使用介面 | Expo 54、React Native 0.81.5、TypeScript、Expo Camera |
-| `services/api` | MediaPipe、規則引擎、資料與 AI provider | Python 3.12、FastAPI、SQLAlchemy、MediaPipe 0.10.x |
+| `app` | Android、iOS 與響應式 Web 使用介面 | Expo 54、React Native 0.81.5、TypeScript、Expo Camera |
+| `backend` | MediaPipe、規則引擎、資料與 AI provider | Python 3.12、FastAPI、SQLAlchemy、MediaPipe 0.10.x |
 | PostgreSQL | 工作階段與衍生指標 | async driver 與本機 Compose 啟動已驗證，外部資料庫尚未建立 |
 | Coolify | client、API 與 PostgreSQL 的主要部署方向 | Docker images／Compose 本機建置與健康檢查已通過，外部資源尚未建立 |
 | Microsoft Foundry | Azure 概念驗證與個人化建議 | 資源／模型／額度尚待確認 |
 
-`apps/client/` 與 `services/api/` 是本專案在新版固定 component root 規則前已建立的 `structure_exception`。兩個目錄本身就是 framework root，`package.json`／`pyproject.toml` 直接位於 component 根目錄；不得再增加 project-name／framework-name wrapper。新學生專案仍以 `app/`、`backend/` 等固定 root 為預設。
+本專案採固定 component roots：Expo 直接位於 `app/`，FastAPI 直接位於 `backend/`。`package.json`／`pyproject.toml` 直接位於 component 根目錄，不增加 project-name、framework-name 或其他分類包層。
 
 ## 快速開始
 
 ### Client
 
 ```bash
-cd apps/client
+cd app
 pnpm install
 cp .env.example .env
 pnpm web
@@ -69,7 +69,7 @@ pnpm web
 ### API
 
 ```bash
-cd services/api
+cd backend
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/python scripts/download_pose_model.py
@@ -99,18 +99,18 @@ python3.12 -m venv .venv
 以下指令用於目前版本的完整驗證：
 
 ```bash
-cd apps/client
+cd app
 pnpm lint
 pnpm typecheck
 pnpm build
 
-cd ../../services/api
+cd ../backend
 .venv/bin/ruff check .
 .venv/bin/mypy
 .venv/bin/pytest -q
 ```
 
-Expo Web 靜態輸出位於 `apps/client/dist/`；該資料夾已忽略，不提交 Git。
+Expo Web 靜態輸出位於 `app/dist/`；該資料夾已忽略，不提交 Git。
 `compose.coolify.yaml` 亦已在 Linux ARM64 容器完成 `web`、`api`、`postgres` 建置、啟動與健康檢查；實際 Coolify domain、HTTPS、備份與 Azure 憑證仍需部署時驗收。
 
 ## 環境變數與敏感資訊
@@ -129,8 +129,8 @@ Expo Web 靜態輸出位於 `apps/client/dist/`；該資料夾已忽略，不提
 - [安全、未成年使用者與隱私](docs/security-and-privacy.md)
 - [AI、MediaPipe 與外部整合](docs/integrations.md)
 - [Coolify 部署邊界](docs/deployment.md)
-- [Client 元件](apps/client/README.md)
-- [API 元件](services/api/README.md)
+- [Client 元件](app/README.md)
+- [API 元件](backend/README.md)
 
 ## Git 與授權邊界
 

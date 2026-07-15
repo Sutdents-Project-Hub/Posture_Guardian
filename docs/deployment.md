@@ -18,8 +18,8 @@
 
 | 元件 | Base directory | 已驗證 | 尚未驗證 |
 |---|---|---|---|
-| Web client | `apps/client` | `pnpm build`、Nginx static routing、port 80、container healthcheck 與首頁回應 | Coolify domain、HTTPS 與相機權限 |
-| API | `services/api` | Uvicorn port 8000、PostgreSQL 連線、model ready health、multipart 影像分析 | Coolify CPU／RAM、cold start 與 timeout |
+| Web client | `app` | `pnpm build`、Nginx static routing、port 80、container healthcheck 與首頁回應 | Coolify domain、HTTPS 與相機權限 |
+| API | `backend` | Uvicorn port 8000、PostgreSQL 連線、model ready health、multipart 影像分析 | Coolify CPU／RAM、cold start 與 timeout |
 | PostgreSQL | Compose `postgres:17-alpine` | persistent volume、healthcheck、asyncpg URL 與 schema 自動建立 | Coolify backup／restore 與 migration 流程 |
 | Microsoft Foundry | Azure external service | 競賽需要 Azure PoC | subscription、region、model deployment、quota、cost、key ownership |
 

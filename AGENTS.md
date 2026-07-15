@@ -41,14 +41,14 @@
 
 為中學生設計的跨平台坐姿覺察系統，使用姿態節點、個人基線與時間窗提供可解釋提醒，並以雲端資料與 AI 產生長期改善建議。
 
-- `apps/client`：行動應用程式；依 `Expo` 的官方慣例維護，不可把其他元件的秘密或責任移入此處。
-- `services/api`：後端／API；依 `FastAPI` 的官方慣例維護，不可把其他元件的秘密或責任移入此處。
-- `structure_exception`：保留既有 `apps/client/` 與 `services/api/` 路徑；兩者本身就是 framework root，manifest 直接位於各 component，不得增加 project-name 或 framework-name wrapper。這是既有專案例外，不是新專案預設。
+- `app`：行動應用程式；依 `Expo` 的官方慣例維護，不可把其他元件的秘密或責任移入此處。
+- `backend`：後端／API；依 `FastAPI` 的官方慣例維護，不可把其他元件的秘密或責任移入此處。
+- 專案結構採公司慣例的固定 component roots：`app/` 與 `backend/`；兩者本身就是 framework root，manifest 直接位於各 component，不得增加 project-name 或 framework-name wrapper。
 - Expo SDK 54、pnpm、Python 3.12 與 FastAPI 是已實作且符合競賽展示需求的技術選型；除非另行核准遷移，不為了套用公司新專案基線而更換。
 
 - 目前已有可操作的 MVP：Expo 相機／展示模式、10 秒校準、MediaPipe 姿態分析、持續時間事件、提醒、工作階段、SQLite／PostgreSQL 相容儲存、Foundry provider 與 fallback。尚未建立 Coolify、PostgreSQL 或 Azure 外部資源，不得把容器設定描述成已部署服務。
 - 姿勢定義、起始門檻、時間窗、介入階段與驗證方式以 `docs/posture-evaluation.md` 為準；修改規則時同步文件與測試。
-- `apps/client/app/` 是 Expo Router 入口；`services/api/src/posture_guardian_api/main.py` 是 FastAPI 入口。
+- `app/app/` 是 Expo Router 入口；`backend/src/posture_guardian_api/main.py` 是 FastAPI 入口。
 
 - Repository 與新專案根目錄名稱維持 `Posture_Guardian`；技術資源優先使用 `posture-guardian` 或平台既有慣例。
 - 新 component id、路徑與一般文件名使用簡短且能表達責任的 lowercase kebab-case；程式碼內命名遵守各 framework 慣例。
@@ -74,7 +74,7 @@
 - 使用者當次明確要求即代表目前敘述方向已獲核准；一般範圍內實作與文件同步不需額外等待批准。只有結果會實質改變架構、權限／安全、保存資料、破壞性行為、外部服務／成本／授權、production／部署、姿勢／醫療安全邊界或競賽驗收時才停止確認。
 - 實作前辨識受影響的權威文件，完成前在同一任務同步；文件同步是完成條件，不是之後再補的工作。
 - 產品定位、功能範圍、實作順序與驗收更新 `docs/project-overview.md`；專案分類、元件或部署狀態改變時同步 `docs/project-profile.md`。
-- 姿勢規則、校準、門檻、時間窗、介入階段或驗證方法更新 `docs/posture-evaluation.md` 與對應測試；資料、安全、AI／MediaPipe 或外部整合更新 `docs/data-and-storage.md`、`docs/security-and-privacy.md`、`docs/integrations.md` 及受影響的 `apps/client/README.md`／`services/api/README.md`。
+- 姿勢規則、校準、門檻、時間窗、介入階段或驗證方法更新 `docs/posture-evaluation.md` 與對應測試；資料、安全、AI／MediaPipe 或外部整合更新 `docs/data-and-storage.md`、`docs/security-and-privacy.md`、`docs/integrations.md` 及受影響的 `app/README.md`／`backend/README.md`。
 - 啟動、指令、環境變數、Compose、Coolify、資料庫或 rollback 改變時，更新根 `README.md`、元件 README、`.env.example` 與 `docs/deployment.md` 中實際受影響的文件。
 - Demo、競賽評分證據、Azure 概念驗證或限制改變時同步 `docs/competition.md`；不把規劃、假設或未執行結果寫成已實作或已驗證。
 - 優先更新既有權威文件，不為了形式新增空 Markdown。
