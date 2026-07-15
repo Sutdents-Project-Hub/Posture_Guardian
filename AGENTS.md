@@ -4,7 +4,7 @@
 
 - 本檔適用於整個 `姿勢守衛隊 Posture Guardian` repository；子目錄若有更具體的 `AGENTS.md`，只在該範圍內補充本檔。
 - 依序遵守使用者當次指示、本檔、根目錄 `README.md`、`docs/` 與元件 README；內容衝突時先停止並確認。
-- 目前階段：競賽／展示。部署狀態：Coolify。
+- 目前階段：競賽／展示。部署目標：Coolify（尚未建立外部資源或正式部署）。
 - Git repository 名稱：`Posture_Guardian`。全新專案的初始 branch 為 `main`。
 
 - Project slug：`posture-guardian`
@@ -41,6 +41,10 @@
 - `apps/client`：行動應用程式；依 `Expo` 的官方慣例維護，不可把其他元件的秘密或責任移入此處。
 - `services/api`：後端／API；依 `FastAPI` 的官方慣例維護，不可把其他元件的秘密或責任移入此處。
 
+- 目前已有可操作的 MVP：Expo 相機／展示模式、10 秒校準、MediaPipe 姿態分析、持續時間事件、提醒、工作階段、SQLite／PostgreSQL 相容儲存、Foundry provider 與 fallback。尚未建立 Coolify、PostgreSQL 或 Azure 外部資源，不得把容器設定描述成已部署服務。
+- 姿勢定義、起始門檻、時間窗、介入階段與驗證方式以 `docs/posture-evaluation.md` 為準；修改規則時同步文件與測試。
+- `apps/client/app/` 是 Expo Router 入口；`services/api/src/posture_guardian_api/main.py` 是 FastAPI 入口。
+
 - Repository 與新專案根目錄名稱維持 `Posture_Guardian`；技術資源優先使用 `posture-guardian` 或平台既有慣例。
 - 新 component id、路徑與一般文件名使用簡短且能表達責任的 lowercase kebab-case；程式碼內命名遵守各 framework 慣例。
 - 保留現有且可工作的專案結構與框架慣例；新增元件時才選擇清楚、簡短、符合責任的路徑。
@@ -51,11 +55,19 @@
 ## 工作方式
 
 - 修改前先讀根 README、相關文件、manifest、設定與實際程式碼；不得只依資料夾名稱猜測。
+- 使用者要求修改 UI、功能、修正問題或其他實作時，先自行檢查脈絡並做合理假設，直接完成實作、驗證與必要視覺檢查；只有資訊會明顯改變成果、操作不可逆、涉及外部發布／付費／帳號／敏感資料，或已無法安全繼續時才詢問。
+- 規劃放在簡短進度或既有專案文件；除非使用者明確要求，不建立只供流程審閱的 spec、plan 或 todo 檔案，也不重複要求已明確同意的方向。
 - 小型文案或單點修正可直接處理；一般功能先說明假設、範圍與驗證；登入、權限、個資、資料庫、刪除、AI 外部服務、部署或跨元件變更先提出計畫與成功標準。
 - 只做完成任務所需的最小一致修改；不要混入無關重構、格式化、重新命名、移檔或依賴升級。
 - 發現不在範圍內的問題時記錄並回報，不要順手修。
 - 以可觀察結果驗證：優先執行現有的 lint、typecheck、test、build 或實際操作；無法執行時明確回報原因與剩餘風險。
 - 不得聲稱未實際執行的測試、部署、外部操作或人工驗收已完成。
+
+## Superpowers 手動啟用
+
+- Superpowers plugin 預設不得使用。
+- 只有使用者訊息明確包含 `[@superpowers](plugin://superpowers@openai-curated-remote)` 時，才可在該工作範圍使用 Superpowers skills；任務完成或切換要求後自動恢復停用。
+- 未啟用時仍可使用 Codex 原生能力、原生子代理與其他適用的非 Superpowers skills。
 
 ## README 與文件同步
 
@@ -73,6 +85,7 @@
 
 ## Git、Commit 與 Pull Request
 
+- 目前本機 repository 已在 `main` 建立初始化 commit `71a3b1d`，且未設定 remote；決賽 MVP 的程式與文件變更仍在 worktree，未經使用者要求不得自行提交。
 - 全新專案初始化的固定例外是：執行 `git init -b main`，安全掃描通過後只 stage 初始化產物，並建立 `chore(init): 初始化學生專案結構`。既有 Git repository 不適用此例外。
 - 除上述固定初始 commit 外，只有使用者明確要求時才可 commit、push、建立 PR、merge、release 或部署；各項授權彼此獨立。
 - 每次 branch、commit、merge、push 或 PR 前，先執行 `git status --short --branch`、`git branch --show-current` 與 `git remote -v`，確認目前分支、working tree、變更範圍、remote 與本次授權。

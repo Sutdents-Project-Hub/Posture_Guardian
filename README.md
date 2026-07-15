@@ -1,85 +1,126 @@
 # 姿勢守衛隊 Posture Guardian
 
-> 目前階段：競賽／展示｜部署：Coolify
+> 決賽 MVP 已完成可操作垂直切片｜真人相機與離線展示模式皆可執行｜外部 Coolify／Azure 資源尚未建立
 
 ## 專案簡介
 
-為中學生設計的跨平台坐姿覺察系統，使用姿態節點、個人基線與時間窗提供可解釋提醒，並以雲端資料與 AI 產生長期改善建議。
+姿勢守衛隊是為長時間讀書的中學生設計的跨平台坐姿覺察系統。目標不是診斷疾病，而是透過相機姿態節點、個人中性坐姿基線與持續時間，讓使用者及早察覺姿勢偏移，再用雲端趨勢與 AI 建議協助養成習慣。
 
+本專案已進入第六屆中學生黑客松決賽，主賽事日期為 2026-07-26。目前已具備一條穩定、可重現、可離線降級的展示流程。
 
-## 專案資訊
+## 核心方案
 
-- Repository：`Posture_Guardian`
-- Project slug：`posture-guardian`
-- 產品型態：`hybrid`
-- Bootstrap 模式：`executable`
+1. 使用者選擇正面或側面視角，完成 10 秒個人校準。
+2. MediaPipe Pose Landmarker 擷取人體姿態節點；規則引擎計算可解釋角度與偏移。
+3. 偏移持續超過時間窗才提醒，避免每次小動作都打斷使用者。
+4. PostgreSQL 只保存衍生指標、工作階段與提醒事件，預設不保存原始影像。
+5. Microsoft Foundry 模型讀取摘要指標，產生個人化改善建議；模型不可用時使用明確標示的規則式 fallback。
 
+姿勢標準、初期／進階／加強介入條件與驗證方式以 [姿勢判定規格](docs/posture-evaluation.md) 為準。
 
-## 目標與主要功能
+## 目前狀態
 
-- 相機權限、拍攝視角選擇與個人中性坐姿校準
-- 人體姿態節點擷取與偵測品質檢查
-- 可解釋的頭頸、肩線與軀幹偏移指標
-- 時間窗平滑、姿勢分數與低干擾提醒
-- 依改善程度調整的初期、進階與加強介入階段
-- 坐姿工作階段、改善趨勢與情緒體驗回饋
-- PostgreSQL 衍生指標儲存與隱私控制
-- Microsoft Foundry 模型產生個人化建議與競賽 Azure 概念驗證
-- 可重現的決賽展示流程、限制說明與答辯證據
-
-- 只列入本階段已確認、可展示或可驗收的功能；構想與未來功能請明確標示為非本階段範圍。
+| 項目 | 狀態 |
+|---|---|
+| Expo Android／iOS／Web | 首頁、相機設定、校準、即時偵測、摘要、趨勢與設定已實作 |
+| FastAPI | MediaPipe 分析、工作階段、歷史、刪除與健康檢查已實作 |
+| 姿態事件與提醒 | 10 秒校準、8 秒持續判定、3 秒回正與分級 cooldown 已實作 |
+| 資料庫 | SQLAlchemy schema 已實作；本機預設 SQLite，production 可切 PostgreSQL |
+| Microsoft Foundry | Responses API provider 已實作；沒有憑證時使用規則式 fallback |
+| Coolify／Microsoft Foundry 資源 | 尚未建立、未部署 |
+| 本機 Git | `main`，初始 commit `71a3b1d`，未設定 remote |
 
 ## 技術與元件
 
-| 路徑 | 責任 | 技術 | 狀態 |
-|---|---|---|---|
-| `apps/client` | 行動應用程式 | Expo | 已要求實體 bootstrap；以 manifest 與 lockfile 驗證 |
-| `services/api` | 後端／API | FastAPI | 已要求實體 bootstrap；以 manifest 與 lockfile 驗證 |
-
-## 專案結構
-
-- 目前只記錄實際存在的元件；不建立未使用的空資料夾。
-- 每個獨立元件依自己的 manifest、README 與框架慣例安裝、啟動、測試及建置。
+| 路徑 | 責任 | 已驗證技術 |
+|---|---|---|
+| `apps/client` | Android、iOS 與響應式 Web 使用介面 | Expo 54、React Native 0.81.5、TypeScript、Expo Camera |
+| `services/api` | MediaPipe、規則引擎、資料與 AI provider | Python 3.12、FastAPI、SQLAlchemy、MediaPipe 0.10.x |
+| PostgreSQL | 工作階段與衍生指標 | async driver 與本機 Compose 啟動已驗證，外部資料庫尚未建立 |
+| Coolify | client、API 與 PostgreSQL 的主要部署方向 | Docker images／Compose 本機建置與健康檢查已通過，外部資源尚未建立 |
+| Microsoft Foundry | Azure 概念驗證與個人化建議 | 資源／模型／額度尚待確認 |
 
 ## 快速開始
 
-初始化器已確認 framework manifest、選定的 lockfile 與 Profile 要求的品質 script 存在；這不代表指令已執行成功。請實際執行元件 README 列出的檢查，然後補上已驗證的前置需求、安裝、啟動、port 與本機 URL。
+### Client
+
+```bash
+cd apps/client
+pnpm install
+cp .env.example .env
+pnpm web
+```
+
+實機可使用 Expo Go 掃描 `pnpm start` 顯示的 QR code。手機必須能連到開發電腦；API URL 需改成同一區網可連線的位址。
+
+### API
+
+```bash
+cd services/api
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+.venv/bin/python scripts/download_pose_model.py
+.venv/bin/uvicorn posture_guardian_api.main:app --host 127.0.0.1 --port 8000
+```
+
+- Bootstrap status：`http://127.0.0.1:8000/`
+- Dependency health：`http://127.0.0.1:8000/health`
+- OpenAPI 文件：`http://127.0.0.1:8000/docs`
+
+首頁的「試看展示模式」不需要相機或 MediaPipe 推論即可完成校準、提醒與摘要，適合作為決賽網路備援。要保存展示結果，API 仍需啟動。
+
+## API 功能
+
+| Method | Path | 用途 |
+|---|---|---|
+| `POST` | `/api/v1/posture/analyze` | 暫存影格轉 33 節點、角度、品質與門檻結果 |
+| `POST` | `/api/v1/sessions` | 以匿名 profile 建立校準後工作階段 |
+| `POST` | `/api/v1/sessions/{id}/samples` | 儲存衍生角度與事件，不儲存影像 |
+| `POST` | `/api/v1/sessions/{id}/complete` | 彙整比例、事件、建議與介入階段 |
+| `GET` | `/api/v1/sessions` | 讀取趨勢紀錄 |
+| `DELETE` | `/api/v1/profiles/{id}/data` | 刪除匿名 profile 的全部紀錄 |
 
 ## 測試與品質
 
-只記錄實際存在且已執行成功的 lint、typecheck、test、build 或手動驗收方式。若目前沒有自動化測試，請明確記錄主要人工驗收流程與限制。
+2026-07-15 已實際通過：
+
+```bash
+cd apps/client
+pnpm lint
+pnpm typecheck
+pnpm build
+
+cd ../../services/api
+.venv/bin/ruff check .
+.venv/bin/mypy
+.venv/bin/pytest -q
+```
+
+Expo Web 靜態輸出位於 `apps/client/dist/`；該資料夾已忽略，不提交 Git。
+`compose.coolify.yaml` 亦已在 Linux ARM64 容器完成 client、API、PostgreSQL 建置、啟動與健康檢查；實際 Coolify domain、HTTPS、備份與 Azure 憑證仍需部署時驗收。
 
 ## 環境變數與敏感資訊
 
-- 真實值只存放於本機或部署平台，不提交 `.env`。
-- 以 `.env.example` 記錄必要的變數名稱、用途與安全 placeholder；公開前端設定不可用來保存秘密。
-
-## 部署狀態
-
-目前狀態：Coolify。只有在設定與流程實際驗證後，才補上平台、base directory、build/start command、port、healthcheck、資料與回滾方式。
-
-## Git 與版本控制
-
-- Repository 名稱：`Posture_Guardian`
-- 全新專案由初始化器建立本機 `main` branch，並在安全掃描後以 `chore(init): 初始化學生專案結構` 提交本次初始化產物。
-- 既有 Git repository 保留原 branch 與歷史，不自動 commit。
-- 初始化不設定 `user.name`／`user.email`，不建立 remote，也不 push；後續 Git 操作遵守 [AGENTS.md](AGENTS.md)。
-- 後續操作先以 `git remote -v` 判斷本機或遠端模式；只要求 commit 時維持目前分支，獲准合併並驗證 `main` 後才安全關閉已完整合併的任務 branch。
+- 只提交 `.env.example`，真實 `.env`、API key、資料庫密碼與個資不得提交。
+- `EXPO_PUBLIC_*` 會出現在公開 client bundle，不能保存秘密。
+- 原始相機畫面預設只在處理期間短暫存在，不寫入資料庫、log 或 AI prompt。
 
 ## 文件索引
 
 - [專案 Profile](docs/project-profile.md)
-- [專案範圍與驗收](docs/project-overview.md)
-- [競賽與展示準備](docs/competition.md)
-- [部署說明](docs/deployment.md)
-- [安全、身份與隱私](docs/security-and-privacy.md)
+- [專案範圍、架構與實作順序](docs/project-overview.md)
+- [姿勢判定與介入階段](docs/posture-evaluation.md)
+- [競賽策略與展示流程](docs/competition.md)
 - [資料與儲存](docs/data-and-storage.md)
-- [外部整合與 AI](docs/integrations.md)
-- [apps/client 元件說明](apps/client/README.md)
-- [services/api 元件說明](services/api/README.md)
+- [安全、未成年使用者與隱私](docs/security-and-privacy.md)
+- [AI、MediaPipe 與外部整合](docs/integrations.md)
+- [Coolify 部署邊界](docs/deployment.md)
+- [Client 元件](apps/client/README.md)
+- [API 元件](services/api/README.md)
 
-## 維護與交接
+## Git 與授權邊界
 
-- 開發規則請見 [AGENTS.md](AGENTS.md)。
-- 功能、架構、指令、環境變數、部署或限制改變時，需同步更新相關文件。
-- LICENSE、資料集、模型與素材授權須依作者、學校及競賽規則確認，不由初始化工具自行決定。
+- 初始化器已建立本機 `main` 與 `chore(init): 初始化學生專案結構`。
+- 未建立 GitHub repository、remote、PR、push、release 或部署。
+- 尚未選擇 LICENSE；須先確認學生作者、競賽、模型、資料與素材授權。
+- 後續 Git 操作遵守 [AGENTS.md](AGENTS.md)，尤其是精確 staging 與敏感資料檢查。

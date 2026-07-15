@@ -19,13 +19,26 @@ quotations/
 # Dependencies, build, and local tools
 node_modules/
 .dart_tool/
+.expo/
 .venv/
 venv/
 dist/
 build/
 coverage/
+output/
+.playwright-cli/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+*.egg-info/
+.firecrawl/
 .DS_Store
 *.log
+*.db
+*.db-shm
+*.db-wal
+services/api/models/*.task
 
 # IDE
 .idea/
