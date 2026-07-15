@@ -1,37 +1,46 @@
-import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { AppProvider } from '@/context/app-context';
-import { Palette } from '@/constants/design';
+import { useAppTheme } from '@/hooks/use-app-theme';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
+  return (
+    <AppProvider>
+      <ThemedApp />
+    </AppProvider>
+  );
+}
+
+function ThemedApp() {
+  const { palette, resolvedTheme } = useAppTheme();
+  const baseTheme = resolvedTheme === 'dark' ? DarkTheme : DefaultTheme;
   const theme = {
-    ...DefaultTheme,
+    ...baseTheme,
+    dark: resolvedTheme === 'dark',
     colors: {
-      ...DefaultTheme.colors,
-      background: Palette.canvas,
-      card: Palette.surface,
-      text: Palette.ink,
-      primary: Palette.primary,
-      border: Palette.line,
+      ...baseTheme.colors,
+      background: palette.canvas,
+      card: palette.surface,
+      text: palette.ink,
+      primary: palette.primary,
+      border: palette.line,
     },
   };
 
   return (
-    <AppProvider>
-      <ThemeProvider value={theme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="session" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        </Stack>
-        <StatusBar style="dark" />
-      </ThemeProvider>
-    </AppProvider>
+    <ThemeProvider value={theme}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="session" options={{ headerShown: false, animation: 'slide_from_right' }} />
+      </Stack>
+      <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
+    </ThemeProvider>
   );
 }

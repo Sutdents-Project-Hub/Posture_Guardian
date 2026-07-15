@@ -66,3 +66,6 @@ export type SessionSample = {
   deviations: Record<string, number>;
   reasons: string[];
 };
+
+export type ReminderFit = 'just_right' | 'too_frequent' | 'easy_to_miss';
+export type SessionFeeling = 'interrupted' | 'in_control' | 'neutral';

@@ -4,7 +4,7 @@
 
 `services/api` 承接 MediaPipe 姿態節點、可解釋規則、工作階段資料、PostgreSQL 與 AI provider。client 不得直接連資料庫或保存 provider secret。
 
-已實作影像型態／5 MB 限制、33 節點推論、視角指標、匿名工作階段、衍生 sample、歷史、刪除、Foundry Responses API 與 fallback。影格只存在請求記憶體，不會寫入資料表。
+已實作影像型態／5 MB 限制、33 節點推論、視角指標、匿名工作階段、衍生 sample、六次趨勢 AI 輸入、不含自由文字的提醒感受、歷史、刪除、Foundry Responses API 與 fallback。影格只存在請求記憶體，不會寫入資料表。
 
 ## 已驗證環境
 

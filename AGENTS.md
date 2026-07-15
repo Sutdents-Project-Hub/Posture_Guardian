@@ -8,6 +8,9 @@
 - Git repository 名稱：`Posture_Guardian`。全新專案的初始 branch 為 `main`。
 
 - Project slug：`posture-guardian`
+- 本機 Docker Compose project：`posture_guardian`；主要 `compose.coolify.yaml` 必須明確設定頂層 `name: posture_guardian`。
+- Coolify project：`posture-guardian`；Coolify services：`posture-guardian-web`、`posture-guardian-api`、`posture-guardian-postgres`。
+- Compose services 使用 `web`、`api`、`postgres`，不設定 `container_name`；容器名稱由 Compose project 與 service role 產生。
 - 產品型態：`hybrid`
 - Bootstrap 模式：`executable`
 

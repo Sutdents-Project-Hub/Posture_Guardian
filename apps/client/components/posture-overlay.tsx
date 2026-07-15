@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
 
-import { Palette } from '@/constants/design';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import type { Landmark } from '@/types/posture';
 
 const CONNECTIONS: [number, number][] = [
@@ -28,10 +28,11 @@ export function PostureOverlay({
   landmarks: Landmark[];
   attention?: boolean;
 }) {
+  const { palette } = useAppTheme();
   const visible = new Map(
     landmarks.filter((point) => point.visibility >= 0.5).map((point) => [point.index, point]),
   );
-  const color = attention ? Palette.accent : '#75F0CE';
+  const color = attention ? palette.warning : palette.accent;
   return (
     <View style={[StyleSheet.absoluteFill, styles.nonInteractive]}>
       <Svg width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">

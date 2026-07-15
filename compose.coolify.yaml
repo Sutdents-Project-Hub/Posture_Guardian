@@ -1,5 +1,7 @@
+name: posture_guardian
+
 services:
-  database:
+  postgres:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
@@ -20,19 +22,19 @@ services:
     restart: unless-stopped
     environment:
       APP_ENV: production
-      DATABASE_URL: postgresql://posture_guardian:${POSTGRES_PASSWORD}@database:5432/posture_guardian
+      DATABASE_URL: postgresql://posture_guardian:${POSTGRES_PASSWORD}@postgres:5432/posture_guardian
       CORS_ORIGINS: ${WEB_ORIGIN:?Set WEB_ORIGIN to the public HTTPS client origin}
       AI_PROVIDER: ${AI_PROVIDER:-fallback}
       AZURE_FOUNDRY_ENDPOINT: ${AZURE_FOUNDRY_ENDPOINT:-}
       AZURE_FOUNDRY_API_KEY: ${AZURE_FOUNDRY_API_KEY:-}
       AZURE_FOUNDRY_MODEL: ${AZURE_FOUNDRY_MODEL:-gpt-4.1-mini}
     depends_on:
-      database:
+      postgres:
         condition: service_healthy
     expose:
       - "8000"
 
-  client:
+  web:
     build:
       context: ./apps/client
       args:

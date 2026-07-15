@@ -4,8 +4,10 @@ import type {
   AnalysisResponse,
   HealthResponse,
   InterventionStage,
+  ReminderFit,
   SessionCompleteResponse,
   SessionSample,
+  SessionFeeling,
   SessionSummary,
   ViewMode,
 } from '@/types/posture';
@@ -96,6 +98,17 @@ export async function addSessionSample(sessionId: string, sample: SessionSample)
 
 export async function completeSession(sessionId: string): Promise<SessionCompleteResponse> {
   return request(`/api/v1/sessions/${sessionId}/complete`, { method: 'POST' });
+}
+
+export async function submitSessionFeedback(
+  sessionId: string,
+  payload: { reminder_fit: ReminderFit; feeling: SessionFeeling | null },
+): Promise<void> {
+  await request(`/api/v1/sessions/${sessionId}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getSessions(profileId: string): Promise<SessionSummary[]> {

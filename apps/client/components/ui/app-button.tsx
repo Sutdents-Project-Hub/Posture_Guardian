@@ -1,7 +1,9 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 
-import { Palette, Radius, Spacing, Typography } from '@/constants/design';
+import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
+import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
 
 type Props = {
   label: string;
@@ -26,6 +28,8 @@ export function AppButton({
   style,
   accessibilityHint,
 }: Props) {
+  const { gradients, palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const isDisabled = disabled || loading;
   return (
     <Pressable
@@ -43,30 +47,35 @@ export function AppButton({
         isDisabled && styles.disabled,
         style,
       ]}>
-      {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === 'primary' || variant === 'danger' ? Palette.white : Palette.primary}
-        />
-      ) : icon ? (
-        <MaterialIcons
-          name={icon}
-          size={20}
-          color={variant === 'primary' || variant === 'danger' ? Palette.white : Palette.primary}
-        />
+      {variant === 'primary' ? (
+        <LinearGradient colors={gradients.primary} style={StyleSheet.absoluteFill} />
       ) : null}
-      <Text
-        style={[
-          styles.label,
-          variant === 'primary' || variant === 'danger' ? styles.lightLabel : styles.darkLabel,
-        ]}>
-        {label}
-      </Text>
+      <>
+        {loading ? (
+          <ActivityIndicator
+            size="small"
+            color={variant === 'primary' || variant === 'danger' ? palette.white : palette.primaryDark}
+          />
+        ) : icon ? (
+          <MaterialIcons
+            name={icon}
+            size={20}
+            color={variant === 'primary' || variant === 'danger' ? palette.white : palette.primaryDark}
+          />
+        ) : null}
+        <Text
+          style={[
+            styles.label,
+            variant === 'primary' || variant === 'danger' ? styles.lightLabel : styles.darkLabel,
+          ]}>
+          {label}
+        </Text>
+      </>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => StyleSheet.create({
   base: {
     minHeight: 48,
     minWidth: 48,
@@ -77,11 +86,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.xs,
     borderWidth: 1,
+    overflow: 'hidden',
   },
-  primary: { backgroundColor: Palette.primary, borderColor: Palette.primary },
-  secondary: { backgroundColor: Palette.surface, borderColor: Palette.primary },
-  ghost: { backgroundColor: 'transparent', borderColor: Palette.line },
-  danger: { backgroundColor: Palette.warning, borderColor: Palette.warning },
+  primary: { backgroundColor: palette.primary, borderColor: '#8E7AFF' },
+  secondary: { backgroundColor: palette.primaryPale, borderColor: palette.primaryDark },
+  ghost: { backgroundColor: 'transparent', borderColor: palette.line },
+  danger: { backgroundColor: palette.danger, borderColor: palette.danger },
   fullWidth: { width: '100%' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
   disabled: { opacity: 0.45 },
@@ -90,6 +100,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.body,
     fontWeight: '700',
   },
-  lightLabel: { color: Palette.white },
-  darkLabel: { color: Palette.primaryDark },
+  lightLabel: { color: palette.white },
+  darkLabel: { color: palette.primaryDark },
 });

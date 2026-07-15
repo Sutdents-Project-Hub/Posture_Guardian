@@ -56,6 +56,13 @@ def test_session_lifecycle_stores_only_derived_values() -> None:
         assert body["summary"]["primary_issue"] == "頭頸前傾角度偏移"
         assert body["summary"]["insight_provider"] == "fallback"
 
+        feedback = client.post(
+            f"/api/v1/sessions/{session_id}/feedback",
+            json={"reminder_fit": "just_right", "feeling": "in_control"},
+        )
+        assert feedback.status_code == 200
+        assert feedback.json()["accepted"] is True
+
         history = client.get("/api/v1/sessions", params={"profile_id": profile_id})
         assert history.status_code == 200
         assert history.json()["items"][0]["id"] == session_id

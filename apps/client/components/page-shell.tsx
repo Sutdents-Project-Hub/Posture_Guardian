@@ -1,4 +1,5 @@
 import { PropsWithChildren, ReactNode } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   RefreshControl,
   ScrollView,
@@ -11,7 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
-import { Palette, Spacing, Typography } from '@/constants/design';
+import { Spacing, Typography, type ThemePalette } from '@/constants/design';
+import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
 
 type Props = PropsWithChildren<{
   title?: string;
@@ -31,13 +33,29 @@ export function PageShell({
   onRefresh,
   contentStyle,
 }: Props) {
+  const { gradients, palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      <LinearGradient
+        colors={gradients.ambient}
+        locations={[0, 0.46, 1]}
+        start={{ x: 0.08, y: 0 }}
+        end={{ x: 0.92, y: 0.82 }}
+        style={styles.ambient}
+      />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, contentStyle]}
         refreshControl={
-          onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined
+          onRefresh ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={palette.accent}
+              colors={[palette.primary]}
+            />
+          ) : undefined
         }>
         {(title || eyebrow) && (
           <View style={styles.header}>
@@ -45,7 +63,7 @@ export function PageShell({
               <BrandMark />
               <View style={styles.headingCopy}>
                 {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-                {title ? <Text style={styles.title}>{title}</Text> : null}
+                {title ? <Text accessibilityRole="header" style={styles.title}>{title}</Text> : null}
               </View>
             </View>
             {right}
@@ -57,8 +75,9 @@ export function PageShell({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Palette.canvas },
+const createStyles = (palette: ThemePalette) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: palette.canvas },
+  ambient: { ...StyleSheet.absoluteFillObject, pointerEvents: 'none' },
   scroll: { flex: 1 },
   content: {
     width: '100%',
@@ -80,14 +99,14 @@ const styles = StyleSheet.create({
   headingCopy: { flexShrink: 1 },
   eyebrow: {
     fontFamily: Typography.family,
-    color: Palette.primary,
+    color: palette.accent,
     fontSize: Typography.caption,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
   title: {
     fontFamily: Typography.family,
-    color: Palette.ink,
+    color: palette.ink,
     fontSize: Typography.h2,
     lineHeight: 29,
     fontWeight: '800',

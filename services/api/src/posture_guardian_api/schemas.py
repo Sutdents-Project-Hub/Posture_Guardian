@@ -85,6 +85,19 @@ class SampleAccepted(BaseModel):
     accepted: bool = True
 
 
+class SessionFeedbackCreate(BaseModel):
+    """Optional low-risk reminder experience feedback."""
+
+    reminder_fit: Literal["just_right", "too_frequent", "easy_to_miss"]
+    feeling: Literal["interrupted", "in_control", "neutral"] | None = None
+
+
+class FeedbackAccepted(BaseModel):
+    """Acknowledgement for an upserted categorical feedback response."""
+
+    accepted: bool = True
+
+
 class SessionSummary(BaseModel):
     """Completed session summary used by dashboard and history screens."""
 

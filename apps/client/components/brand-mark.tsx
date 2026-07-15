@@ -1,9 +1,12 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Palette, Radius } from '@/constants/design';
+import { Radius, type ThemePalette } from '@/constants/design';
+import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
 
 export function BrandMark({ inverse = false }: { inverse?: boolean }) {
-  const color = inverse ? Palette.white : Palette.primary;
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const color = inverse ? palette.white : palette.primaryDark;
   return (
     <View accessible={false} style={[styles.frame, { borderColor: color }]}>
       <View style={styles.bars}>
@@ -11,17 +14,18 @@ export function BrandMark({ inverse = false }: { inverse?: boolean }) {
         <View style={[styles.bar, styles.tall, { backgroundColor: color }]} />
         <View style={[styles.bar, styles.medium, { backgroundColor: color }]} />
       </View>
-      <View style={[styles.dot, { backgroundColor: Palette.accent }]} />
+      <View style={[styles.dot, { backgroundColor: palette.accent }]} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => StyleSheet.create({
   frame: {
     width: 40,
     height: 40,
     borderRadius: 13,
-    borderWidth: 2,
+    borderWidth: 1.5,
+    backgroundColor: palette.primaryPale,
     padding: 8,
     flexDirection: 'row',
     alignItems: 'flex-end',

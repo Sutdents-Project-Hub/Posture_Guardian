@@ -18,27 +18,39 @@ class InsightInput:
     average_score: float
     primary_issue: str | None
     intervention_stage: str
+    qualified_session_count: int = 0
+    previous_three_average: float | None = None
+    recent_three_average: float | None = None
+    improvement_points: float | None = None
 
 
 def fallback_insight(data: InsightInput) -> str:
     """Generate concise, explainable guidance with no network dependency."""
     if data.valid_minutes < 1:
-        return "這次有效資料較短，先把耳朵、肩膀與髖部完整放進畫面，再完成至少 5 分鐘觀察。"
+        return (
+            "趨勢：這次有效資料較短｜下一步：把耳、肩與髖完整放進畫面｜"
+            "下次目標：完成至少 5 分鐘觀察"
+        )
 
     issue = data.primary_issue or "姿勢角度"
+    if data.improvement_points is not None:
+        direction = "提升" if data.improvement_points >= 0 else "下降"
+        trend = f"最近三次較前三次{direction} {abs(data.improvement_points):.0f} 個百分點"
+    else:
+        trend = f"已累積 {data.qualified_session_count}/6 次合格資料"
     if data.good_posture_rate >= 85:
         return (
-            f"這次有 {data.good_posture_rate:.0f}% 的有效時間維持在個人基線範圍內。"
-            "繼續每 25–30 分鐘起身活動，避免為了追求分數而僵硬坐著。"
+            f"趨勢：{trend}｜下一步：維持自然呼吸，不必僵硬追分｜"
+            "下次目標：每 25–30 分鐘起身活動"
         )
     if data.good_posture_rate >= 65:
         return (
-            f"主要偏移是「{issue}」。下次先調整螢幕高度與椅背，再觀察 5 分鐘；"
-            "提醒出現時緩慢回到舒服的中性坐姿。"
+            f"趨勢：{trend}，主要偏移為「{issue}」｜下一步：先調整螢幕高度與椅背｜"
+            "下次目標：重新校準後觀察 5 分鐘"
         )
     return (
-        f"這次「{issue}」出現較頻繁。建議先休息 5 分鐘，重新校準相機與座椅位置，"
-        "再開始較短的工作階段；若持續不適，應停止使用並尋求專業協助。"
+        f"趨勢：{trend}，「{issue}」較頻繁｜下一步：先休息 5 分鐘並調整座椅｜"
+        "下次目標：重新校準後完成較短觀察"
     )
 
 
@@ -50,13 +62,23 @@ async def generate_insight(data: InsightInput, settings: Settings) -> tuple[str,
     endpoint = settings.azure_foundry_endpoint.rstrip("/")
     base_url = endpoint if endpoint.endswith("/openai/v1") else f"{endpoint}/openai/v1"
     client = AsyncOpenAI(api_key=settings.azure_foundry_api_key, base_url=base_url)
+    previous_average = (
+        data.previous_three_average if data.previous_three_average is not None else "不足"
+    )
+    recent_average = data.recent_three_average if data.recent_three_average is not None else "不足"
+    improvement = data.improvement_points if data.improvement_points is not None else "不足"
     prompt = (
-        "你是中學生姿勢覺察系統的教練。根據以下匿名彙總產生 70 字內繁體中文建議。"
-        "只提供可執行的環境調整、休息與重新校準建議；不可診斷、恐嚇或聲稱醫療效果。\n"
+        "你是中學生姿勢覺察系統的教練。根據以下同一匿名使用者的去識別彙總，"
+        "用繁體中文輸出「趨勢：…｜下一步：…｜下次目標：…」，總長 120 字內。"
+        "只提供一項可執行的環境調整、休息或重新校準建議；不可診斷、恐嚇、"
+        "聲稱醫療效果，亦不可把短資料解讀成改善。\n"
         f"視角={data.view_mode}; 有效分鐘={data.valid_minutes:.1f}; "
         f"良好坐姿率={data.good_posture_rate:.1f}%; 提醒事件={data.event_count}; "
         f"平均分數={data.average_score:.1f}; 主要偏移={data.primary_issue or '無'}; "
-        f"介入階段={data.intervention_stage}"
+        f"介入階段={data.intervention_stage}; "
+        f"合格長期資料={data.qualified_session_count}/6; "
+        f"前三次平均={previous_average}; 最近三次平均={recent_average}; "
+        f"改善百分點={improvement}"
     )
     try:
         response = await client.responses.create(

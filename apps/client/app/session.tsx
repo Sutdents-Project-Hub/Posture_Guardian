@@ -5,12 +5,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   Vibration,
   View,
 } from 'react-native';
@@ -23,20 +23,25 @@ import { StatusPill } from '@/components/status-pill';
 import { AppButton } from '@/components/ui/app-button';
 import { Surface } from '@/components/ui/surface';
 import { useAppContext } from '@/context/app-context';
-import { Palette, Radius, Spacing, Typography } from '@/constants/design';
+import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
+import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
 import {
   addSessionSample,
   analyzePosture,
   completeSession,
   createSession,
+  submitSessionFeedback,
 } from '@/lib/api';
 import { createDemoAnalysis } from '@/lib/demo';
 import { formatDuration, STAGE_LABELS, VIEW_LABELS } from '@/lib/format';
+import { useWideLayout } from '@/hooks/use-wide-layout';
 import type {
   AnalysisResponse,
   InterventionStage,
+  ReminderFit,
   SessionCompleteResponse,
   SessionSummary,
+  SessionFeeling,
   ViewMode,
 } from '@/types/posture';
 
@@ -60,11 +65,12 @@ function median(values: number[]): number {
 }
 
 export default function SessionScreen() {
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ mode?: string; demo?: string }>();
   const viewMode: ViewMode = params.mode === 'front' ? 'front' : 'side';
   const demo = params.demo === '1';
-  const { width } = useWindowDimensions();
-  const isWide = width >= 900;
+  const isWide = useWideLayout(900);
   const {
     profileId,
     interventionStage,
@@ -427,8 +433,12 @@ export default function SessionScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.topBar}>
-        <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={close} style={styles.iconButton}>
-          <MaterialIcons name="close" size={24} color={Palette.ink} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="返回"
+          onPress={close}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.buttonPressed]}>
+          <MaterialIcons name="close" size={24} color={palette.ink} />
         </Pressable>
         <View style={styles.topTitle}>
           <Text style={styles.topEyebrow}>{demo ? '展示模式' : '即時骨架分析'}</Text>
@@ -445,7 +455,16 @@ export default function SessionScreen() {
         <View style={[styles.workspace, isWide && styles.workspaceWide]}>
           <View style={[styles.previewColumn, isWide && styles.previewColumnWide]}>
             <View style={styles.preview}>
-              {demo ? (
+              {phase === 'finishing' ? (
+                <View style={styles.finishingBackdrop} accessibilityLiveRegion="polite">
+                  <View style={styles.finishingOrb}>
+                    <ActivityIndicator size="large" color={palette.accent} />
+                  </View>
+                  <Text style={styles.finishingEyebrow}>AI SESSION SYNTHESIS</Text>
+                  <Text style={styles.finishingTitle}>正在整理趨勢與下一步</Text>
+                  <Text style={styles.finishingText}>計算良好坐姿率、主要偏移與提醒階段，雲端失敗時會安全切回本地摘要。</Text>
+                </View>
+              ) : demo ? (
                 <View style={styles.demoBackdrop}>
                   <View style={styles.demoGridHorizontal} />
                   <View style={styles.demoGridVertical} />
@@ -463,7 +482,7 @@ export default function SessionScreen() {
                 />
               ) : (
                 <View style={styles.cameraPlaceholder}>
-                  <MaterialIcons name="photo-camera" size={42} color={Palette.primary} />
+                  <MaterialIcons name="photo-camera" size={42} color={palette.primary} />
                   <Text style={styles.placeholderTitle}>相機預覽會出現在這裡</Text>
                   <Text style={styles.placeholderText}>按下開始校準時才會要求相機權限。</Text>
                 </View>
@@ -474,24 +493,32 @@ export default function SessionScreen() {
                   attention={analysis.status === 'attention'}
                 />
               ) : null}
-              <View style={styles.guideFrame}>
-                <View style={[styles.corner, styles.cornerTopLeft]} />
-                <View style={[styles.corner, styles.cornerTopRight]} />
-                <View style={[styles.corner, styles.cornerBottomLeft]} />
-                <View style={[styles.corner, styles.cornerBottomRight]} />
-              </View>
-              {phase !== 'setup' ? (
-                <View style={styles.previewStatus}>
+              {phase !== 'finishing' ? (
+                <View style={styles.guideFrame}>
+                  <View style={[styles.corner, styles.cornerTopLeft]} />
+                  <View style={[styles.corner, styles.cornerTopRight]} />
+                  <View style={[styles.corner, styles.cornerBottomLeft]} />
+                  <View style={[styles.corner, styles.cornerBottomRight]} />
+                </View>
+              ) : null}
+              {phase !== 'setup' && phase !== 'finishing' ? (
+                <View style={styles.previewStatus} accessibilityLiveRegion="polite">
                   <StatusPill label={statusLabel} tone={eventActive ? 'warning' : statusTone} />
                 </View>
               ) : null}
-              {!demo && permission?.granted ? (
+              {phase !== 'setup' && phase !== 'finishing' ? (
+                <View style={styles.aiLiveBadge}>
+                  <View style={styles.aiLiveDot} />
+                  <Text style={styles.aiLiveText}>AI LIVE · 33 LANDMARKS</Text>
+                </View>
+              ) : null}
+              {!demo && permission?.granted && cameraVisible ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="切換前後鏡頭"
                   onPress={() => setFacing((value) => (value === 'front' ? 'back' : 'front'))}
-                  style={styles.flipButton}>
-                  <MaterialIcons name="flip-camera-ios" size={22} color={Palette.white} />
+                  style={({ pressed }) => [styles.flipButton, pressed && styles.buttonPressed]}>
+                  <MaterialIcons name="flip-camera-ios" size={22} color={palette.white} />
                 </Pressable>
               ) : null}
             </View>
@@ -546,6 +573,8 @@ function SetupPanel({
   message: string | null;
   onStart: () => void;
 }) {
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const points =
     viewMode === 'side'
       ? ['相機放在肩膀高度，拍到同側耳朵、肩膀與髖部。', '身體與鏡頭呈側面，避免桌面遮住髖部。']
@@ -553,7 +582,7 @@ function SetupPanel({
   return (
     <Surface style={styles.setupPanel}>
       <View style={styles.panelIcon}>
-        <MaterialIcons name="center-focus-strong" size={28} color={Palette.primary} />
+        <MaterialIcons name="center-focus-strong" size={28} color={palette.primary} />
       </View>
       <Text style={styles.panelEyebrow}>開始前 30 秒</Text>
       <Text style={styles.panelTitle}>先把畫面設定好</Text>
@@ -561,18 +590,18 @@ function SetupPanel({
       <View style={styles.checkList}>
         {points.map((point) => (
           <View key={point} style={styles.checkRow}>
-            <MaterialIcons name="check-circle" size={20} color={Palette.success} />
+            <MaterialIcons name="check-circle" size={20} color={palette.success} />
             <Text style={styles.checkText}>{point}</Text>
           </View>
         ))}
         <View style={styles.checkRow}>
-          <MaterialIcons name="check-circle" size={20} color={Palette.success} />
+          <MaterialIcons name="check-circle" size={20} color={palette.success} />
           <Text style={styles.checkText}>校準後若移動相機或換座位，請重新開始。</Text>
         </View>
       </View>
       {message ? (
         <View style={styles.errorBox}>
-          <MaterialIcons name="error-outline" size={20} color={Palette.warning} />
+          <MaterialIcons name="error-outline" size={20} color={palette.warning} />
           <Text style={styles.errorText}>{message}</Text>
         </View>
       ) : null}
@@ -604,11 +633,13 @@ function LivePanel({
   storageAvailable: boolean;
   message: string | null;
 }) {
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const metrics = Object.entries(analysis?.deviations || {});
   return (
     <View style={styles.liveStack}>
-      <Surface tone={eventActive ? 'danger' : analysis?.status === 'attention' ? 'amber' : 'green'} style={styles.scoreCard}>
-        <ScoreGauge value={analysis?.posture_score ?? 0} size={126} />
+      <Surface tone={eventActive ? 'danger' : analysis?.status === 'attention' ? 'amber' : 'ai'} style={styles.scoreCard}>
+        <ScoreGauge value={analysis?.posture_score ?? null} size={126} />
         <View style={styles.scoreCopy}>
           <Text style={styles.panelEyebrow}>{phase === 'calibrating' ? '建立個人基線' : STAGE_LABELS[interventionStage]}</Text>
           <Text style={styles.scoreTitle}>
@@ -629,7 +660,7 @@ function LivePanel({
             const exceeded = Math.abs(value) > threshold;
             return (
               <View key={key} style={styles.angleRow}>
-                <View style={[styles.angleDot, { backgroundColor: exceeded ? Palette.warning : Palette.success }]} />
+                <View style={[styles.angleDot, { backgroundColor: exceeded ? palette.warning : palette.success }]} />
                 <Text style={styles.angleLabel}>{metricLabel(key)}</Text>
                 <Text style={[styles.angleValue, exceeded && styles.angleValueWarning]}>
                   {value > 0 ? '+' : ''}{value.toFixed(1)}°
@@ -652,7 +683,7 @@ function LivePanel({
       </View>
       {message ? (
         <View style={styles.errorBox}>
-          <MaterialIcons name="error-outline" size={20} color={Palette.warning} />
+          <MaterialIcons name="error-outline" size={20} color={palette.warning} />
           <Text style={styles.errorText}>{message}</Text>
         </View>
       ) : null}
@@ -678,7 +709,27 @@ function SummaryView({
   completion: SessionCompleteResponse;
   onRestart: () => void;
 }) {
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const { summary } = completion;
+  const [reminderFit, setReminderFit] = useState<ReminderFit | null>(null);
+  const [feeling, setFeeling] = useState<SessionFeeling | null>(null);
+  const [feedbackStatus, setFeedbackStatus] = useState<'idle' | 'saving' | 'saved' | 'offline'>('idle');
+
+  async function saveFeedback() {
+    if (!reminderFit) return;
+    if (summary.id.startsWith('local-')) {
+      setFeedbackStatus('offline');
+      return;
+    }
+    setFeedbackStatus('saving');
+    try {
+      await submitSessionFeedback(summary.id, { reminder_fit: reminderFit, feeling });
+      setFeedbackStatus('saved');
+    } catch {
+      setFeedbackStatus('offline');
+    }
+  }
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.summaryPage}>
@@ -688,7 +739,7 @@ function SummaryView({
         </View>
         <Surface style={styles.summaryHero}>
           <StatusPill label="工作階段已完成" tone="success" />
-          <Text style={styles.summaryHeading}>這次不是「坐得完美」，{`\n`}而是更快察覺變化。</Text>
+          <Text style={styles.summaryHeading}>更快察覺變化，就是這次的進步。</Text>
           <ScoreGauge value={summary.good_posture_rate} size={160} label="良好坐姿率" />
           <Text style={styles.summaryCaption}>有效時間內，未處於持續姿勢事件的比例</Text>
         </Surface>
@@ -699,7 +750,7 @@ function SummaryView({
         </View>
         <Surface tone="dark" style={styles.summaryInsight}>
           <View style={styles.coachIcon}>
-            <MaterialIcons name="auto-awesome" size={26} color={Palette.accent} />
+            <MaterialIcons name="auto-awesome" size={26} color={palette.onDarkAccent} />
           </View>
           <View style={styles.summaryInsightCopy}>
             <Text style={styles.summaryInsightEyebrow}>
@@ -712,12 +763,63 @@ function SummaryView({
           <Text style={styles.stageReasonTitle}>下一階段：{STAGE_LABELS[completion.suggested_stage]}</Text>
           <Text style={styles.stageReasonText}>{completion.stage_reason}</Text>
         </Surface>
+        <Surface style={styles.feedbackCard}>
+          <View style={styles.feedbackHeading}>
+            <View style={styles.feedbackHeadingCopy}>
+              <Text style={styles.panelEyebrow}>REMINDER EXPERIENCE</Text>
+              <Text style={styles.feedbackTitle}>剛才的提醒感受如何？</Text>
+            </View>
+            <MaterialIcons name="sentiment-satisfied" size={28} color={palette.accent} />
+          </View>
+          <Text style={styles.feedbackLead}>只收集分類選項、不收自由文字，讓團隊能改進提醒而不增加未成年使用者個資。</Text>
+          <Text style={styles.feedbackLabel}>提醒強度</Text>
+          <View style={styles.feedbackOptions} accessibilityRole="radiogroup">
+            <FeedbackChoice label="剛剛好" selected={reminderFit === 'just_right'} onPress={() => setReminderFit('just_right')} />
+            <FeedbackChoice label="太頻繁" selected={reminderFit === 'too_frequent'} onPress={() => setReminderFit('too_frequent')} />
+            <FeedbackChoice label="不容易注意" selected={reminderFit === 'easy_to_miss'} onPress={() => setReminderFit('easy_to_miss')} />
+          </View>
+          <Text style={styles.feedbackLabel}>當下心情（選填）</Text>
+          <View style={styles.feedbackOptions} accessibilityRole="radiogroup">
+            <FeedbackChoice label="有掌控感" selected={feeling === 'in_control'} onPress={() => setFeeling('in_control')} />
+            <FeedbackChoice label="被打斷" selected={feeling === 'interrupted'} onPress={() => setFeeling('interrupted')} />
+            <FeedbackChoice label="沒有明顯感覺" selected={feeling === 'neutral'} onPress={() => setFeeling('neutral')} />
+          </View>
+          <AppButton
+            label={feedbackStatus === 'saved' ? '已送出感受' : feedbackStatus === 'offline' ? '目前離線，未送出' : '送出感受'}
+            icon={feedbackStatus === 'saved' ? 'check' : 'send'}
+            variant={feedbackStatus === 'saved' ? 'ghost' : 'secondary'}
+            loading={feedbackStatus === 'saving'}
+            disabled={!reminderFit || feedbackStatus === 'saved' || feedbackStatus === 'offline'}
+            onPress={() => void saveFeedback()}
+          />
+        </Surface>
         <View style={styles.summaryActions}>
           <AppButton label="回到首頁" variant="secondary" onPress={() => router.replace('/')} />
           <AppButton label="再測一次" icon="replay" onPress={onRestart} />
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function FeedbackChoice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.feedbackChoice,
+        selected && styles.feedbackChoiceSelected,
+        pressed && styles.buttonPressed,
+      ]}>
+      <View style={[styles.feedbackRadio, selected && styles.feedbackRadioSelected]}>
+        {selected ? <View style={styles.feedbackRadioDot} /> : null}
+      </View>
+      <Text style={[styles.feedbackChoiceText, selected && styles.feedbackChoiceTextSelected]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -730,22 +832,24 @@ function SummaryMetric({
   value: string;
   icon: keyof typeof MaterialIcons.glyphMap;
 }) {
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <Surface style={styles.summaryMetric}>
-      <MaterialIcons name={icon} size={24} color={Palette.primary} />
+      <MaterialIcons name={icon} size={24} color={palette.primary} />
       <Text style={styles.summaryMetricLabel}>{label}</Text>
       <Text style={styles.summaryMetricValue}>{value}</Text>
     </Surface>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Palette.canvas },
+const createStyles = (palette: ThemePalette) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: palette.canvas },
   topBar: { width: '100%', maxWidth: 1180, alignSelf: 'center', minHeight: 72, paddingHorizontal: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  iconButton: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: Palette.surface, borderWidth: 1, borderColor: Palette.line },
+  iconButton: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line },
   topTitle: { flex: 1 },
-  topEyebrow: { fontFamily: Typography.family, color: Palette.primary, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.8 },
-  topHeading: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  topEyebrow: { fontFamily: Typography.family, color: palette.primary, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.8 },
+  topHeading: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
   topSpacer: { width: 48 },
   content: { width: '100%', maxWidth: 1180, alignSelf: 'center', padding: Spacing.md, paddingBottom: Spacing.xxl },
   workspace: { gap: Spacing.lg },
@@ -754,14 +858,19 @@ const styles = StyleSheet.create({
   previewColumnWide: { flex: 1.2 },
   panelColumn: { minWidth: 0 },
   panelColumnWide: { flex: 0.8 },
-  preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 650, overflow: 'hidden', borderRadius: Radius.lg, backgroundColor: '#173B39', borderWidth: 1, borderColor: '#2B5A56' },
-  demoBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: '#153B39', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  demoGridHorizontal: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, backgroundColor: '#2A514E' },
-  demoGridVertical: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, backgroundColor: '#2A514E' },
-  demoLabel: { position: 'absolute', left: 18, top: 18, fontFamily: 'monospace', color: '#84B7AC', fontSize: 11, letterSpacing: 1 },
-  cameraPlaceholder: { flex: 1, backgroundColor: Palette.primaryPale, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg, gap: Spacing.sm },
-  placeholderTitle: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h3, fontWeight: '900', textAlign: 'center' },
-  placeholderText: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.small, textAlign: 'center' },
+  preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 650, overflow: 'hidden', borderRadius: Radius.lg, backgroundColor: palette.canvasRaised, borderWidth: 1, borderColor: palette.lineBright },
+  demoBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0A1029', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  demoGridHorizontal: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, backgroundColor: palette.lineBright },
+  demoGridVertical: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, backgroundColor: palette.lineBright },
+  demoLabel: { position: 'absolute', right: 18, top: 18, fontFamily: 'monospace', color: palette.onDarkAccent, fontSize: 11, letterSpacing: 1 },
+  finishingBackdrop: { flex: 1, minHeight: 280, backgroundColor: palette.canvasRaised, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, gap: Spacing.sm },
+  finishingOrb: { width: 78, height: 78, borderRadius: 39, backgroundColor: palette.accentPale, borderWidth: 1, borderColor: palette.lineBright, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm },
+  finishingEyebrow: { color: palette.accent, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 1 },
+  finishingTitle: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.h2, fontWeight: '900', textAlign: 'center' },
+  finishingText: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.small, lineHeight: 21, textAlign: 'center', maxWidth: 480 },
+  cameraPlaceholder: { flex: 1, backgroundColor: palette.primaryPale, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg, gap: Spacing.sm },
+  placeholderTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900', textAlign: 'center' },
+  placeholderText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, textAlign: 'center' },
   guideFrame: { ...StyleSheet.absoluteFillObject, margin: 22, pointerEvents: 'none' },
   corner: { position: 'absolute', width: 30, height: 30, borderColor: 'rgba(255,255,255,0.72)' },
   cornerTopLeft: { left: 0, top: 0, borderLeftWidth: 3, borderTopWidth: 3, borderTopLeftRadius: 8 },
@@ -769,58 +878,76 @@ const styles = StyleSheet.create({
   cornerBottomLeft: { left: 0, bottom: 0, borderLeftWidth: 3, borderBottomWidth: 3, borderBottomLeftRadius: 8 },
   cornerBottomRight: { right: 0, bottom: 0, borderRightWidth: 3, borderBottomWidth: 3, borderBottomRightRadius: 8 },
   previewStatus: { position: 'absolute', left: 16, bottom: 16 },
-  flipButton: { position: 'absolute', right: 16, top: 16, width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: Palette.overlay },
-  progressCard: { gap: Spacing.sm, backgroundColor: Palette.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Palette.line, padding: Spacing.md },
+  aiLiveBadge: { position: 'absolute', left: 16, top: 16, minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: palette.overlay, borderRadius: Radius.pill, borderWidth: 1, borderColor: palette.lineBright, paddingHorizontal: Spacing.sm },
+  aiLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.onDarkAccent },
+  aiLiveText: { color: palette.onDarkAccent, fontFamily: 'monospace', fontSize: 10, fontWeight: '800', letterSpacing: 0.7 },
+  flipButton: { position: 'absolute', right: 16, top: 16, width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.overlay },
+  progressCard: { gap: Spacing.sm, backgroundColor: palette.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: palette.line, padding: Spacing.md },
   progressCopy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
-  progressTitle: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.small, fontWeight: '900' },
-  progressText: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.caption, flexShrink: 1, textAlign: 'right' },
-  progressTrack: { height: 9, overflow: 'hidden', borderRadius: Radius.pill, backgroundColor: Palette.surfaceMuted },
-  progressFill: { height: '100%', borderRadius: Radius.pill, backgroundColor: Palette.primary },
+  progressTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.small, fontWeight: '900' },
+  progressText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, flexShrink: 1, textAlign: 'right' },
+  progressTrack: { height: 9, overflow: 'hidden', borderRadius: Radius.pill, backgroundColor: palette.surfaceMuted },
+  progressFill: { height: '100%', borderRadius: Radius.pill, backgroundColor: palette.primary },
   setupPanel: { gap: Spacing.md },
-  panelIcon: { width: 58, height: 58, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: Palette.primaryPale },
-  panelEyebrow: { fontFamily: Typography.family, color: Palette.primary, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.7 },
-  panelTitle: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h2, fontWeight: '900' },
-  panelLead: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.small, lineHeight: 22 },
+  panelIcon: { width: 58, height: 58, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primaryPale },
+  panelEyebrow: { fontFamily: Typography.family, color: palette.primary, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.7 },
+  panelTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h2, fontWeight: '900' },
+  panelLead: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, lineHeight: 22 },
   checkList: { gap: Spacing.sm, paddingVertical: Spacing.xs },
   checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
-  checkText: { flex: 1, fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.small, lineHeight: 21 },
-  errorBox: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, padding: Spacing.sm, borderRadius: Radius.sm, backgroundColor: Palette.warningPale },
-  errorText: { flex: 1, fontFamily: Typography.family, color: '#8C331F', fontSize: Typography.caption, lineHeight: 19 },
-  disclaimer: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.caption, lineHeight: 18, textAlign: 'center' },
+  checkText: { flex: 1, fontFamily: Typography.family, color: palette.ink, fontSize: Typography.small, lineHeight: 21 },
+  errorBox: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, padding: Spacing.sm, borderRadius: Radius.sm, backgroundColor: palette.warningPale },
+  errorText: { flex: 1, fontFamily: Typography.family, color: palette.warningText, fontSize: Typography.caption, lineHeight: 19 },
+  disclaimer: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 18, textAlign: 'center' },
   liveStack: { gap: Spacing.md },
   scoreCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md },
   scoreCopy: { flex: 1, gap: 4 },
-  scoreTitle: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h3, fontWeight: '900' },
-  scoreText: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.caption, lineHeight: 19 },
+  scoreTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  scoreText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 19 },
   liveMetrics: { gap: Spacing.sm, padding: Spacing.md },
   liveHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  liveTitle: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.body, fontWeight: '900' },
-  timer: { fontFamily: 'monospace', color: Palette.primary, fontSize: Typography.small, fontWeight: '700' },
-  angleRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, borderTopWidth: 1, borderTopColor: Palette.line },
+  liveTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.body, fontWeight: '900' },
+  timer: { fontFamily: 'monospace', color: palette.primary, fontSize: Typography.small, fontWeight: '700' },
+  angleRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, borderTopWidth: 1, borderTopColor: palette.line },
   angleDot: { width: 8, height: 8, borderRadius: 4 },
-  angleLabel: { flex: 1, fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.small, fontWeight: '700' },
-  angleValue: { fontFamily: 'monospace', color: Palette.success, fontSize: Typography.body, fontWeight: '900' },
-  angleValueWarning: { color: Palette.warning },
-  angleThreshold: { width: 76, fontFamily: Typography.family, color: Palette.inkSoft, fontSize: 10, textAlign: 'right' },
-  waitingText: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.small, lineHeight: 21, paddingVertical: Spacing.md },
+  angleLabel: { flex: 1, fontFamily: Typography.family, color: palette.ink, fontSize: Typography.small, fontWeight: '700' },
+  angleValue: { fontFamily: 'monospace', color: palette.success, fontSize: Typography.body, fontWeight: '900' },
+  angleValueWarning: { color: palette.warning },
+  angleThreshold: { width: 86, fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, textAlign: 'right' },
+  waitingText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, lineHeight: 21, paddingVertical: Spacing.md },
   diagnosticRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   summaryPage: { width: '100%', maxWidth: 900, alignSelf: 'center', padding: Spacing.md, paddingBottom: Spacing.xxl, gap: Spacing.lg },
   summaryBrand: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, minHeight: 58 },
-  summaryBrandText: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  summaryBrandText: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
   summaryHero: { alignItems: 'center', gap: Spacing.lg, paddingVertical: Spacing.xl },
-  summaryHeading: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h1, lineHeight: 39, fontWeight: '900', textAlign: 'center' },
-  summaryCaption: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.caption, textAlign: 'center' },
+  summaryHeading: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h1, lineHeight: 39, fontWeight: '900', textAlign: 'center' },
+  summaryCaption: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, textAlign: 'center' },
   summaryMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
   summaryMetric: { flex: 1, minWidth: 180, gap: Spacing.xs, padding: Spacing.md },
-  summaryMetricLabel: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.caption, fontWeight: '700' },
-  summaryMetricValue: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  summaryMetricLabel: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, fontWeight: '700' },
+  summaryMetricValue: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
   summaryInsight: { flexDirection: 'row', gap: Spacing.md, alignItems: 'flex-start' },
-  coachIcon: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#264342' },
+  coachIcon: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.accentPale },
   summaryInsightCopy: { flex: 1, gap: Spacing.xs },
-  summaryInsightEyebrow: { fontFamily: Typography.family, color: Palette.accent, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.7 },
-  summaryInsightText: { fontFamily: Typography.family, color: Palette.white, fontSize: Typography.body, lineHeight: 25 },
+  summaryInsightEyebrow: { fontFamily: Typography.family, color: palette.onDarkAccent, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.7 },
+  summaryInsightText: { fontFamily: Typography.family, color: palette.white, fontSize: Typography.body, lineHeight: 25 },
   stageReason: { gap: Spacing.xs },
-  stageReasonTitle: { fontFamily: Typography.family, color: '#745018', fontSize: Typography.body, fontWeight: '900' },
-  stageReasonText: { fontFamily: Typography.family, color: '#745018', fontSize: Typography.small, lineHeight: 21 },
+  stageReasonTitle: { fontFamily: Typography.family, color: palette.warningText, fontSize: Typography.body, fontWeight: '900' },
+  stageReasonText: { fontFamily: Typography.family, color: palette.warningTextSoft, fontSize: Typography.small, lineHeight: 21 },
+  feedbackCard: { gap: Spacing.md },
+  feedbackHeading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  feedbackHeadingCopy: { flex: 1, gap: 4 },
+  feedbackTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  feedbackLead: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 19 },
+  feedbackLabel: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.small, fontWeight: '800' },
+  feedbackOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  feedbackChoice: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: Radius.pill, paddingHorizontal: Spacing.sm, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.canvasRaised },
+  feedbackChoiceSelected: { borderColor: palette.primary, backgroundColor: palette.primaryPale },
+  feedbackRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: palette.inkSoft, alignItems: 'center', justifyContent: 'center' },
+  feedbackRadioSelected: { borderColor: palette.primaryDark },
+  feedbackRadioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: palette.primaryDark },
+  feedbackChoiceText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, fontWeight: '700' },
+  feedbackChoiceTextSelected: { color: palette.ink },
   summaryActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm },
+  buttonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
 });

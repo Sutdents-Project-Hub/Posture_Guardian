@@ -1,10 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Palette, Radius, Spacing, Typography } from '@/constants/design';
+import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
+import { useThemedStyles } from '@/hooks/use-app-theme';
 
 type Tone = 'success' | 'warning' | 'neutral' | 'info';
 
 export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: Tone }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={[styles.base, styles[`${tone}Background`]]}>
       <View style={[styles.dot, styles[`${tone}Dot`]]} />
@@ -13,7 +15,7 @@ export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => StyleSheet.create({
   base: {
     minHeight: 32,
     borderRadius: Radius.pill,
@@ -21,19 +23,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.sm,
     gap: 7,
+    borderWidth: 1,
+    borderColor: palette.line,
   },
   dot: { width: 7, height: 7, borderRadius: 4 },
   label: { fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '800' },
-  successBackground: { backgroundColor: Palette.primaryPale },
-  warningBackground: { backgroundColor: Palette.warningPale },
-  neutralBackground: { backgroundColor: Palette.surfaceMuted },
-  infoBackground: { backgroundColor: Palette.accentPale },
-  successDot: { backgroundColor: Palette.success },
-  warningDot: { backgroundColor: Palette.warning },
-  neutralDot: { backgroundColor: Palette.inkSoft },
-  infoDot: { backgroundColor: Palette.accent },
-  successText: { color: Palette.primaryDark },
-  warningText: { color: '#8C331F' },
-  neutralText: { color: Palette.inkSoft },
-  infoText: { color: '#745018' },
+  successBackground: { backgroundColor: palette.primaryPale },
+  warningBackground: { backgroundColor: palette.warningPale },
+  neutralBackground: { backgroundColor: palette.surfaceMuted },
+  infoBackground: { backgroundColor: palette.accentPale },
+  successDot: { backgroundColor: palette.success },
+  warningDot: { backgroundColor: palette.warning },
+  neutralDot: { backgroundColor: palette.inkSoft },
+  infoDot: { backgroundColor: palette.accent },
+  successText: { color: palette.accent },
+  warningText: { color: palette.warningText },
+  neutralText: { color: palette.inkSoft },
+  infoText: { color: palette.primaryDark },
 });

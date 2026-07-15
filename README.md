@@ -8,13 +8,24 @@
 
 本專案已進入第六屆中學生黑客松決賽，主賽事日期為 2026-07-26。目前已具備一條穩定、可重現、可離線降級的展示流程。
 
+## 命名對照
+
+| 用途 | 名稱 |
+|---|---|
+| GitHub repository／本機根資料夾 | `Posture_Guardian` |
+| Project slug／Coolify project | `posture-guardian` |
+| 本機 Docker Compose project | `posture_guardian` |
+| Coolify services | `posture-guardian-web`、`posture-guardian-api`、`posture-guardian-postgres` |
+
+主要 `compose.coolify.yaml` 明確設定 `name: posture_guardian`；Compose services 使用 `web`、`api`、`postgres` 且不設定 `container_name`。
+
 ## 核心方案
 
 1. 使用者選擇正面或側面視角，完成 10 秒個人校準。
 2. MediaPipe Pose Landmarker 擷取人體姿態節點；規則引擎計算可解釋角度與偏移。
 3. 偏移持續超過時間窗才提醒，避免每次小動作都打斷使用者。
 4. PostgreSQL 只保存衍生指標、工作階段與提醒事件，預設不保存原始影像。
-5. Microsoft Foundry 模型讀取摘要指標，產生個人化改善建議；模型不可用時使用明確標示的規則式 fallback。
+5. Microsoft Foundry 模型讀取同一匿名使用者最近六次的去識別摘要，產生「趨勢、下一步、下次目標」；模型不可用時使用明確標示的規則式 fallback。
 
 姿勢標準、初期／進階／加強介入條件與驗證方式以 [姿勢判定規格](docs/posture-evaluation.md) 為準。
 
@@ -22,8 +33,8 @@
 
 | 項目 | 狀態 |
 |---|---|
-| Expo Android／iOS／Web | 首頁、相機設定、校準、即時偵測、摘要、趨勢與設定已實作 |
-| FastAPI | MediaPipe 分析、工作階段、歷史、刪除與健康檢查已實作 |
+| Expo Android／iOS／Web | AI 首頁、相機設定、校準、即時偵測、摘要、六次趨勢、AI 證據鏈，以及跟隨系統／淺色／深色外觀已實作 |
+| FastAPI | MediaPipe 分析、工作階段、長期 AI 摘要、提醒感受、歷史、刪除與健康檢查已實作 |
 | 姿態事件與提醒 | 10 秒校準、8 秒持續判定、3 秒回正與分級 cooldown 已實作 |
 | 資料庫 | SQLAlchemy schema 已實作；本機預設 SQLite，production 可切 PostgreSQL |
 | Microsoft Foundry | Responses API provider 已實作；沒有憑證時使用規則式 fallback |
@@ -77,12 +88,13 @@ python3.12 -m venv .venv
 | `POST` | `/api/v1/sessions` | 以匿名 profile 建立校準後工作階段 |
 | `POST` | `/api/v1/sessions/{id}/samples` | 儲存衍生角度與事件，不儲存影像 |
 | `POST` | `/api/v1/sessions/{id}/complete` | 彙整比例、事件、建議與介入階段 |
+| `POST` | `/api/v1/sessions/{id}/feedback` | 儲存不含自由文字的提醒感受分類 |
 | `GET` | `/api/v1/sessions` | 讀取趨勢紀錄 |
 | `DELETE` | `/api/v1/profiles/{id}/data` | 刪除匿名 profile 的全部紀錄 |
 
 ## 測試與品質
 
-2026-07-15 已實際通過：
+以下指令用於目前版本的完整驗證：
 
 ```bash
 cd apps/client
@@ -97,7 +109,7 @@ cd ../../services/api
 ```
 
 Expo Web 靜態輸出位於 `apps/client/dist/`；該資料夾已忽略，不提交 Git。
-`compose.coolify.yaml` 亦已在 Linux ARM64 容器完成 client、API、PostgreSQL 建置、啟動與健康檢查；實際 Coolify domain、HTTPS、備份與 Azure 憑證仍需部署時驗收。
+`compose.coolify.yaml` 亦已在 Linux ARM64 容器完成 `web`、`api`、`postgres` 建置、啟動與健康檢查；實際 Coolify domain、HTTPS、備份與 Azure 憑證仍需部署時驗收。
 
 ## 環境變數與敏感資訊
 

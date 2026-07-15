@@ -2,17 +2,20 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Surface } from '@/components/ui/surface';
-import { Palette, Radius, Spacing, Typography } from '@/constants/design';
+import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
+import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
 import { formatDate, formatDuration, VIEW_LABELS } from '@/lib/format';
 import type { SessionSummary } from '@/types/posture';
 
 export function SessionHistoryCard({ session }: { session: SessionSummary }) {
-  const rateColor = session.good_posture_rate >= 75 ? Palette.success : Palette.warning;
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const rateColor = session.good_posture_rate >= 75 ? palette.success : palette.warning;
   return (
     <Surface style={styles.card}>
       <View style={styles.topRow}>
         <View style={styles.iconFrame}>
-          <MaterialIcons name="accessibility-new" size={23} color={Palette.primary} />
+          <MaterialIcons name="accessibility-new" size={23} color={palette.primary} />
         </View>
         <View style={styles.titleBlock}>
           <Text style={styles.title}>{VIEW_LABELS[session.view_mode]}</Text>
@@ -38,7 +41,7 @@ export function SessionHistoryCard({ session }: { session: SessionSummary }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ThemePalette) => StyleSheet.create({
   card: { gap: Spacing.md, padding: Spacing.md },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   iconFrame: {
@@ -47,15 +50,15 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Palette.primaryPale,
+    backgroundColor: palette.primaryPale,
   },
   titleBlock: { flex: 1 },
-  title: { fontFamily: Typography.family, fontSize: Typography.body, fontWeight: '800', color: Palette.ink },
-  date: { fontFamily: Typography.family, fontSize: Typography.caption, color: Palette.inkSoft, marginTop: 2 },
+  title: { fontFamily: Typography.family, fontSize: Typography.body, fontWeight: '800', color: palette.ink },
+  date: { fontFamily: Typography.family, fontSize: Typography.caption, color: palette.inkSoft, marginTop: 2 },
   rate: { fontFamily: Typography.family, fontSize: Typography.h2, fontWeight: '900' },
-  track: { height: 7, borderRadius: Radius.pill, overflow: 'hidden', backgroundColor: Palette.surfaceMuted },
+  track: { height: 7, borderRadius: Radius.pill, overflow: 'hidden', backgroundColor: palette.surfaceMuted },
   trackFill: { height: '100%', borderRadius: Radius.pill },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
-  metric: { fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '700', color: Palette.inkSoft },
-  insight: { fontFamily: Typography.family, fontSize: Typography.small, lineHeight: 21, color: Palette.ink },
+  metric: { fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '700', color: palette.inkSoft },
+  insight: { fontFamily: Typography.family, fontSize: Typography.small, lineHeight: 21, color: palette.ink },
 });

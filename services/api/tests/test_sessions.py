@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 
+from posture_guardian_api.insights import InsightInput, fallback_insight
 from posture_guardian_api.schemas import InterventionStage, SessionSummary, ViewMode
 from posture_guardian_api.sessions import evaluate_stage
 
@@ -64,3 +65,25 @@ def test_stage_decreases_after_ten_point_improvement() -> None:
     stage, _ = evaluate_stage(newest_first, InterventionStage.ADVANCED)
 
     assert stage is InterventionStage.STARTER
+
+
+def test_fallback_insight_explains_long_term_trend() -> None:
+    text = fallback_insight(
+        InsightInput(
+            view_mode="side",
+            valid_minutes=12,
+            good_posture_rate=72,
+            event_count=2,
+            average_score=76,
+            primary_issue="頭頸前傾角度偏移",
+            intervention_stage="starter",
+            qualified_session_count=6,
+            previous_three_average=60,
+            recent_three_average=72,
+            improvement_points=12,
+        )
+    )
+
+    assert "提升 12 個百分點" in text
+    assert "下一步：" in text
+    assert "下次目標：" in text

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from posture_guardian_api.config import get_settings
 from posture_guardian_api.database import get_db
-from posture_guardian_api.models import PostureSample, PostureSession
+from posture_guardian_api.models import PostureSample, PostureSession, SessionFeedback
 from posture_guardian_api.posture import (
     THRESHOLDS,
     PoseAnalyzer,
@@ -22,12 +22,14 @@ from posture_guardian_api.posture import (
 from posture_guardian_api.schemas import (
     AnalysisResponse,
     DeleteResponse,
+    FeedbackAccepted,
     HealthResponse,
     SampleAccepted,
     SampleCreate,
     SessionCompleteResponse,
     SessionCreate,
     SessionCreated,
+    SessionFeedbackCreate,
     SessionList,
     ViewMode,
 )
@@ -170,6 +172,32 @@ async def finish_session(session_id: str, db: DatabaseDep) -> SessionCompleteRes
     if session is None:
         raise HTTPException(status_code=404, detail="找不到工作階段。")
     return await complete_session(db, session, get_settings())
+
+
+@router.post(
+    "/api/v1/sessions/{session_id}/feedback",
+    response_model=FeedbackAccepted,
+    tags=["sessions"],
+)
+async def save_feedback(
+    session_id: str,
+    payload: SessionFeedbackCreate,
+    db: DatabaseDep,
+) -> FeedbackAccepted:
+    """Save optional categorical UX feedback for a completed session."""
+    session = await db.get(PostureSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="找不到工作階段。")
+    if session.ended_at is None:
+        raise HTTPException(status_code=409, detail="工作階段尚未結束。")
+    feedback = await db.get(SessionFeedback, session_id)
+    if feedback is None:
+        feedback = SessionFeedback(session_id=session_id, reminder_fit=payload.reminder_fit)
+        db.add(feedback)
+    feedback.reminder_fit = payload.reminder_fit
+    feedback.feeling = payload.feeling
+    await db.commit()
+    return FeedbackAccepted()
 
 
 @router.get("/api/v1/sessions", response_model=SessionList, tags=["sessions"])

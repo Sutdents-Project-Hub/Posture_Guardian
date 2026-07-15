@@ -1,24 +1,29 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AiOrb } from '@/components/ai-orb';
 import { PageShell } from '@/components/page-shell';
-import { PostureIllustration } from '@/components/posture-illustration';
 import { ScoreGauge } from '@/components/score-gauge';
 import { StatusPill } from '@/components/status-pill';
 import { AppButton } from '@/components/ui/app-button';
 import { Surface } from '@/components/ui/surface';
 import { useAppContext } from '@/context/app-context';
-import { Palette, Radius, Spacing, Typography } from '@/constants/design';
+import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
+import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
 import { getHealth, getSessions } from '@/lib/api';
+import { useWideLayout } from '@/hooks/use-wide-layout';
 import { STAGE_LABELS, VIEW_LABELS } from '@/lib/format';
+import { buildPostureTrend, nextCoachTask } from '@/lib/trends';
 import type { HealthResponse, SessionSummary, ViewMode } from '@/types/posture';
 
 export default function HomeScreen() {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 800;
+  const { gradients, palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const isWide = useWideLayout(800);
   const { profileId, interventionStage, ready } = useAppContext();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -52,6 +57,8 @@ export default function HomeScreen() {
     todaySessions.reduce((total, item) => total + item.valid_seconds, 0) / 60,
   );
   const latest = completed[0];
+  const trend = buildPostureTrend(sessions);
+  const coachTask = nextCoachTask(trend);
 
   function start(mode: ViewMode, demo = false) {
     router.push({ pathname: '/session', params: { mode, demo: demo ? '1' : '0' } });
@@ -69,13 +76,22 @@ export default function HomeScreen() {
           tone={health?.status === 'ok' ? 'success' : 'neutral'}
         />
       }>
-      <Surface style={[styles.hero, isWide && styles.heroWide]}>
+      <LinearGradient
+        colors={gradients.surface}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.hero, isWide && styles.heroWide]}>
         <View style={styles.heroCopy}>
           <StatusPill label={STAGE_LABELS[interventionStage]} tone="info" />
-          <Text style={[styles.display, !isWide && styles.displayNarrow]}>坐得自在，{`\n`}也看得見改變。</Text>
+          <Text style={[styles.display, !isWide && styles.displayNarrow]}>AI 看見偏移，{`\n`}你看見改變。</Text>
           <Text style={styles.lead}>
-            用相機骨架與你的 10 秒基線辨識持續偏移；影像只做即時分析，不會存進資料庫。
+            33 個姿態節點搭配個人基線，先用可解釋規則辨識，再由 AI 把長期趨勢變成下一個小調整。
           </Text>
+          <View style={styles.evidenceChips}>
+            <EvidenceChip icon="accessibility-new" label="33 點骨架" />
+            <EvidenceChip icon="timer" label="10 秒基線" />
+            <EvidenceChip icon="no-photography" label="影像不儲存" />
+          </View>
           <View style={styles.heroActions}>
             <AppButton
               label="開始側面偵測"
@@ -91,12 +107,16 @@ export default function HomeScreen() {
           </View>
         </View>
         <View style={styles.heroVisual}>
-          <PostureIllustration />
+          <AiOrb size={198} />
+          <View style={styles.aiLiveBadge}>
+            <View style={styles.aiLiveDot} />
+            <Text style={styles.aiLiveText}>AI COACH READY</Text>
+          </View>
           <View style={styles.gaugeFloat}>
-            <ScoreGauge value={latest?.average_score ?? 86} size={108} />
+            <ScoreGauge value={latest?.average_score ?? null} size={108} />
           </View>
         </View>
-      </Surface>
+      </LinearGradient>
 
       <View style={styles.sectionHeading}>
         <View>
@@ -136,28 +156,52 @@ export default function HomeScreen() {
         <MetricCard icon="event-note" label="完成工作階段" value={`${completed.length}`} unit="次" />
       </View>
 
-      <Surface tone="dark" style={[styles.coach, isWide && styles.coachWide]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="開啟 AI 洞察"
+        accessibilityHint="查看六次趨勢、個人化任務與 Azure AI 證據鏈"
+        onPress={() => router.push('/(tabs)/insights')}
+        style={({ pressed }) => pressed && styles.pressed}>
+      <Surface tone="ai" style={[styles.coach, isWide && styles.coachWide]}>
         <View style={styles.coachIcon}>
-          <MaterialIcons name="auto-awesome" size={26} color={Palette.accent} />
+          <MaterialIcons name="auto-awesome" size={26} color={palette.accent} />
         </View>
         <View style={styles.coachCopy}>
           <Text style={styles.coachEyebrow}>
             {latest?.insight_provider === 'foundry' ? 'MICROSOFT FOUNDRY 教練' : '規則式姿勢教練'}
           </Text>
-          <Text style={styles.coachTitle}>下一個小調整</Text>
+          <Text style={styles.coachTitle}>{coachTask.title}</Text>
           <Text style={styles.coachText}>
             {latest?.insight_text ||
-              '完成第一個工作階段後，這裡會依良好坐姿率、提醒事件與主要偏移提供一個可執行建議。'}
+              coachTask.detail}
           </Text>
         </View>
-        <MaterialIcons name="arrow-forward" size={26} color={Palette.white} />
+        <MaterialIcons name="arrow-forward" size={26} color={palette.primaryDark} />
       </Surface>
+      </Pressable>
 
       <View style={styles.privacyLine}>
-        <MaterialIcons name="lock-outline" size={18} color={Palette.primary} />
+        <MaterialIcons name="lock-outline" size={18} color={palette.primary} />
         <Text style={styles.privacyText}>隱私優先：只儲存角度、時間與摘要，不儲存相片或即時畫面。</Text>
       </View>
     </PageShell>
+  );
+}
+
+function EvidenceChip({
+  icon,
+  label,
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  label: string;
+}) {
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.evidenceChip}>
+      <MaterialIcons name={icon} size={16} color={palette.accent} />
+      <Text style={styles.evidenceChipText}>{label}</Text>
+    </View>
   );
 }
 
@@ -176,6 +220,8 @@ function ModeCard({
   icon: keyof typeof MaterialIcons.glyphMap;
   onPress: () => void;
 }) {
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <Pressable
       accessibilityRole="button"
@@ -184,7 +230,7 @@ function ModeCard({
       onPress={onPress}
       style={({ pressed }) => [styles.modeCard, pressed && styles.pressed]}>
       <View style={styles.modeIcon}>
-        <MaterialIcons name={icon} size={30} color={Palette.primary} />
+        <MaterialIcons name={icon} size={30} color={palette.primary} />
       </View>
       <View style={styles.modeCopy}>
         <Text style={styles.modeSubtitle}>{subtitle}</Text>
@@ -192,7 +238,7 @@ function ModeCard({
         <Text style={styles.modeDescription}>{description}</Text>
       </View>
       <View style={styles.arrowButton}>
-        <MaterialIcons name="arrow-forward" size={20} color={Palette.white} />
+        <MaterialIcons name="arrow-forward" size={20} color={palette.white} />
       </View>
     </Pressable>
   );
@@ -209,9 +255,11 @@ function MetricCard({
   value: string;
   unit: string;
 }) {
+  const { palette } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <Surface style={styles.metricCard}>
-      <MaterialIcons name={icon} size={22} color={Palette.primary} />
+      <MaterialIcons name={icon} size={22} color={palette.primary} />
       <Text style={styles.metricLabel}>{label}</Text>
       <View style={styles.metricValueRow}>
         <Text style={styles.metricValue}>{value}</Text>
@@ -221,62 +269,68 @@ function MetricCard({
   );
 }
 
-const styles = StyleSheet.create({
-  hero: { backgroundColor: Palette.surface, padding: Spacing.lg, gap: Spacing.xl, overflow: 'hidden' },
+const createStyles = (palette: ThemePalette) => StyleSheet.create({
+  hero: { backgroundColor: palette.surface, padding: Spacing.lg, gap: Spacing.xl, overflow: 'hidden', borderRadius: Radius.lg, borderWidth: 1, borderColor: palette.lineBright },
   heroWide: { flexDirection: 'row', minHeight: 430, padding: Spacing.xxl, alignItems: 'center' },
   heroCopy: { flex: 1.15, alignItems: 'flex-start', gap: Spacing.lg },
   display: {
     fontFamily: Typography.family,
-    color: Palette.ink,
+    color: palette.ink,
     fontSize: Typography.display,
     lineHeight: 50,
     fontWeight: '900',
     letterSpacing: -1.3,
   },
   displayNarrow: { fontSize: 34, lineHeight: 43 },
-  lead: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.body, lineHeight: 27, maxWidth: 590 },
+  lead: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.body, lineHeight: 27, maxWidth: 590 },
   heroActions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  heroVisual: { flex: 0.85, alignItems: 'center', justifyContent: 'center', minHeight: 250 },
-  gaugeFloat: { position: 'absolute', right: 2, bottom: -4, padding: 5, borderRadius: Radius.pill, backgroundColor: Palette.surface },
+  evidenceChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  evidenceChip: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.pill, paddingHorizontal: Spacing.sm, backgroundColor: palette.accentPale, borderWidth: 1, borderColor: palette.accent },
+  evidenceChipText: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '800' },
+  heroVisual: { flex: 0.85, alignItems: 'center', justifyContent: 'center', minHeight: 280 },
+  aiLiveBadge: { position: 'absolute', top: 18, left: 8, minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: Spacing.sm, borderRadius: Radius.pill, backgroundColor: palette.overlay, borderWidth: 1, borderColor: palette.lineBright },
+  aiLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.accent },
+  aiLiveText: { color: palette.accent, fontFamily: Typography.family, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  gaugeFloat: { position: 'absolute', right: 2, bottom: -4, padding: 5, borderRadius: Radius.pill, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.lineBright },
   sectionHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Spacing.md },
-  eyebrow: { fontFamily: Typography.family, color: Palette.primary, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 1 },
-  sectionTitle: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h2, fontWeight: '900', marginTop: 4 },
-  sectionNote: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.caption, textAlign: 'right', flexShrink: 1 },
+  eyebrow: { fontFamily: Typography.family, color: palette.primary, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 1 },
+  sectionTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h2, fontWeight: '900', marginTop: 4 },
+  sectionNote: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, textAlign: 'right', flexShrink: 1 },
   modeGrid: { gap: Spacing.md },
   modeGridWide: { flexDirection: 'row' },
   modeCard: {
     flex: 1,
     minHeight: 178,
-    backgroundColor: Palette.surface,
+    backgroundColor: palette.surface,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: Palette.line,
+    borderColor: palette.line,
     padding: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.md,
   },
   pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
-  modeIcon: { width: 54, height: 54, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: Palette.primaryPale },
+  modeIcon: { width: 54, height: 54, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primaryPale },
   modeCopy: { flex: 1, gap: 4 },
-  modeSubtitle: { fontFamily: Typography.family, color: Palette.primary, fontSize: Typography.caption, fontWeight: '800' },
-  modeTitle: { fontFamily: Typography.family, color: Palette.ink, fontSize: Typography.h3, fontWeight: '900' },
-  modeDescription: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.small, lineHeight: 21, marginTop: 5 },
-  arrowButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: Palette.primary, alignSelf: 'flex-end' },
+  modeSubtitle: { fontFamily: Typography.family, color: palette.primary, fontSize: Typography.caption, fontWeight: '800' },
+  modeTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  modeDescription: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, lineHeight: 21, marginTop: 5 },
+  arrowButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primary, alignSelf: 'flex-end' },
   metricsGrid: { gap: Spacing.md },
   metricsGridWide: { flexDirection: 'row' },
   metricCard: { flex: 1, gap: Spacing.sm, minHeight: 150 },
-  metricLabel: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.small, fontWeight: '700' },
+  metricLabel: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, fontWeight: '700' },
   metricValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  metricValue: { fontFamily: Typography.family, color: Palette.ink, fontSize: 34, fontWeight: '900' },
-  metricUnit: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.small, fontWeight: '700' },
+  metricValue: { fontFamily: Typography.family, color: palette.ink, fontSize: 34, fontWeight: '900' },
+  metricUnit: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, fontWeight: '700' },
   coach: { gap: Spacing.md, alignItems: 'flex-start' },
   coachWide: { flexDirection: 'row', alignItems: 'center', padding: Spacing.xl },
-  coachIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#264342' },
+  coachIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.accentPale },
   coachCopy: { flex: 1, gap: 5 },
-  coachEyebrow: { fontFamily: Typography.family, color: Palette.accent, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.8 },
-  coachTitle: { fontFamily: Typography.family, color: Palette.white, fontSize: Typography.h3, fontWeight: '900' },
-  coachText: { fontFamily: Typography.family, color: '#D8E6E2', fontSize: Typography.small, lineHeight: 22 },
+  coachEyebrow: { fontFamily: Typography.family, color: palette.accent, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.8 },
+  coachTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  coachText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, lineHeight: 22 },
   privacyLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.md },
-  privacyText: { fontFamily: Typography.family, color: Palette.inkSoft, fontSize: Typography.caption, lineHeight: 18, flexShrink: 1 },
+  privacyText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 18, flexShrink: 1 },
 });

@@ -62,3 +62,17 @@ class PostureSample(Base):
     reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     session: Mapped[PostureSession] = relationship(back_populates="samples")
+
+
+class SessionFeedback(Base):
+    """Optional categorical UX feedback without free text or personal data."""
+
+    __tablename__ = "session_feedback"
+
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("posture_sessions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    reminder_fit: Mapped[str] = mapped_column(String(24))
+    feeling: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
