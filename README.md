@@ -51,6 +51,8 @@
 | Coolify | client、API 與 PostgreSQL 的主要部署方向 | Docker images／Compose 本機建置與健康檢查已通過，外部資源尚未建立 |
 | Microsoft Foundry | Azure 概念驗證與個人化建議 | 資源／模型／額度尚待確認 |
 
+`apps/client/` 與 `services/api/` 是本專案在新版固定 component root 規則前已建立的 `structure_exception`。兩個目錄本身就是 framework root，`package.json`／`pyproject.toml` 直接位於 component 根目錄；不得再增加 project-name／framework-name wrapper。新學生專案仍以 `app/`、`backend/` 等固定 root 為預設。
+
 ## 快速開始
 
 ### Client

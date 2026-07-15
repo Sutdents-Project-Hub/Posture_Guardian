@@ -14,6 +14,12 @@
 - Deployment：`coolify`
 - Team collaboration：`true`
 
+## 結構與技術例外
+
+- `structure_exception`：保留新版固定 component root 規則前已建立的 `apps/client/` 與 `services/api/`。兩者各自有獨立 runtime、manifest、品質指令與部署生命週期，且既有 Compose、文件與開發指令皆以此為準；不進行只為改名的搬移。
+- Framework root 證據：`apps/client/package.json` 與 `services/api/pyproject.toml` 直接位於 component 根目錄，沒有 project-name／framework-name wrapper，也沒有巢狀 `.git/`。
+- `technology_source`：`existing-project`。Expo SDK 54、pnpm、Python 3.12 與 FastAPI 是競賽展示、相機支援與姿態分析需求下已實作且可驗證的選型；公司基線只作未指定技術之新專案預設，不自動觸發遷移。
+
 ## 摘要
 
 為中學生設計的跨平台坐姿覺察系統，使用姿態節點、個人基線與時間窗提供可解釋提醒，並以雲端資料與 AI 產生長期改善建議。

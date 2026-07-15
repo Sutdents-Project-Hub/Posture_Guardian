@@ -10,6 +10,8 @@
 
 產品承諾是「當偏移真的持續時才提醒，讓使用者看得到自己逐步改善」，不宣稱矯正脊椎、診斷疾病或取代醫療專業。
 
+`apps/client/` 與 `services/api/` 是保留的既有專案結構例外，也分別是 Expo 與 FastAPI 的 framework root；manifest 直接位於 component 根目錄。此架構不再增加 project-name／framework-name wrapper，後續新元件才依新版固定 component root 規則選擇路徑。
+
 ## 系統邊界
 
 | 邊界 | 責任 | 不負責 |
