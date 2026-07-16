@@ -107,6 +107,6 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   },
   value: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: 11, fontWeight: '800' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, gap: Spacing.xs },
-  emptyTitle: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.body, fontWeight: '900' },
+  emptyTitle: { color: palette.ink, fontFamily: Typography.displayFamily, fontSize: Typography.body, fontWeight: '700' },
   emptyText: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.caption, lineHeight: 19, textAlign: 'center' },
 });

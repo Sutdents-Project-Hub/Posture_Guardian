@@ -25,8 +25,8 @@ const THEME_OPTIONS: {
   icon: keyof typeof MaterialIcons.glyphMap;
 }[] = [
   { value: 'system', title: '跟隨系統', description: '自動配合裝置', icon: 'settings-brightness' },
-  { value: 'light', title: '淺色', description: '霧白與冰藍', icon: 'light-mode' },
-  { value: 'dark', title: '深色', description: '深靛與電光紫', icon: 'dark-mode' },
+  { value: 'light', title: '淺色', description: '暖象牙與陶土橘', icon: 'light-mode' },
+  { value: 'dark', title: '深色', description: '炭墨與暖陶色', icon: 'dark-mode' },
 ];
 
 export default function SettingsScreen() {
@@ -65,7 +65,7 @@ export default function SettingsScreen() {
         <StatusPill label={resolvedTheme === 'dark' ? '目前：深色' : '目前：淺色'} tone="info" />
       </View>
       <Surface style={styles.themeCard}>
-        <Text style={styles.themeLead}>AI 視覺在兩種配色下都保留靛紫與冰藍識別，選擇會儲存在這台裝置。</Text>
+        <Text style={styles.themeLead}>兩種模式都使用暖紙色、陶土橘與墨藍的編輯式配色，選擇會儲存在這台裝置。</Text>
         <View accessibilityRole="radiogroup" style={styles.themeOptions}>
           {THEME_OPTIONS.map((option) => {
             const selected = option.value === themePreference;
@@ -213,7 +213,7 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   },
   themeOptionSelected: { borderColor: palette.primary, backgroundColor: palette.primaryPale },
   themeOptionPressed: { opacity: 0.76 },
-  themeIcon: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surfaceMuted },
+  themeIcon: { width: 42, height: 42, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surfaceMuted, borderWidth: 1, borderColor: palette.line },
   themeIconSelected: { backgroundColor: palette.surface },
   themeCopy: { flex: 1 },
   themeTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.small, fontWeight: '900' },
@@ -227,7 +227,7 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   noticeTitle: { fontFamily: Typography.family, color: palette.warningText, fontSize: Typography.small, fontWeight: '900' },
   noticeText: { fontFamily: Typography.family, color: palette.warningTextSoft, fontSize: Typography.caption, lineHeight: 19 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
-  sectionTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  sectionTitle: { fontFamily: Typography.displayFamily, color: palette.ink, fontSize: Typography.h3, fontWeight: '700' },
   stageList: { gap: Spacing.sm },
   stage: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md },
   stageSelected: { borderColor: palette.primary, borderWidth: 2, backgroundColor: palette.primaryPale },
@@ -238,7 +238,7 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   stageTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.body, fontWeight: '900' },
   stageText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 19, marginTop: 3 },
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  settingIcon: { width: 48, height: 48, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primaryPale },
+  settingIcon: { width: 48, height: 48, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primaryPale, borderWidth: 1, borderColor: palette.primaryDark },
   settingCopy: { flex: 1 },
   settingTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.body, fontWeight: '800' },
   settingText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 19, marginTop: 3 },

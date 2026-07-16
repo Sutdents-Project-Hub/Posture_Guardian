@@ -64,6 +64,6 @@ export function ScoreGauge({
 
 const createStyles = (palette: ThemePalette) => StyleSheet.create({
   copy: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  value: { fontFamily: Typography.family, fontSize: 36, lineHeight: 40, fontWeight: '900' },
+  value: { fontFamily: Typography.displayFamily, fontSize: 36, lineHeight: 40, fontWeight: '700' },
   label: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: 11, fontWeight: '700' },
 });

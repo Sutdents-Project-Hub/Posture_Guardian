@@ -20,8 +20,9 @@ export default function TabLayout() {
           paddingHorizontal: 6,
           backgroundColor: palette.canvasRaised,
           borderTopColor: palette.line,
+          borderTopWidth: 1,
         },
-        tabBarItemStyle: { borderRadius: 18, marginHorizontal: 2 },
+        tabBarItemStyle: { borderRadius: 2, marginHorizontal: 2 },
         tabBarActiveBackgroundColor: palette.primaryPale,
         tabBarLabelStyle: {
           fontFamily: Typography.family,

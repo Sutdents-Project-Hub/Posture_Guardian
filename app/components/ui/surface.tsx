@@ -26,5 +26,5 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   ai: { backgroundColor: palette.primaryPale, borderColor: palette.primaryDark },
   amber: { backgroundColor: palette.warningPale, borderColor: palette.warning },
   danger: { backgroundColor: palette.dangerPale, borderColor: palette.danger },
-  dark: { backgroundColor: '#0B1026', borderColor: '#3B4A7C' },
+  dark: { backgroundColor: palette.inverseSurface, borderColor: palette.inverseLine },
 });

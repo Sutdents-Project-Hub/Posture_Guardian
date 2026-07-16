@@ -33,7 +33,7 @@
 
 | 項目 | 狀態 |
 |---|---|
-| Expo Android／iOS／Web | AI 首頁、相機設定、校準、即時偵測、摘要、六次趨勢、AI 證據鏈，以及跟隨系統／淺色／深色外觀已實作 |
+| Expo Android／iOS／Web | AI 首頁、相機設定、校準、即時偵測、摘要、六次趨勢、AI 證據鏈，以及方角編輯式的跟隨系統／淺色／深色外觀已實作 |
 | FastAPI | MediaPipe 分析、工作階段、長期 AI 摘要、提醒感受、歷史、刪除與健康檢查已實作 |
 | 姿態事件與提醒 | 10 秒校準、8 秒持續判定、3 秒回正與分級 cooldown 已實作 |
 | 資料庫 | SQLAlchemy schema 已實作；本機預設 SQLite，production 可切 PostgreSQL |

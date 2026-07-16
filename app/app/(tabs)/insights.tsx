@@ -101,7 +101,7 @@ export default function InsightsScreen() {
         style={[styles.hero, isWide && styles.heroWide]}>
         <View style={styles.heroCopy}>
           <View style={styles.heroBadge}>
-            <MaterialIcons name="auto-awesome" size={16} color={palette.white} />
+            <MaterialIcons name="auto-awesome" size={16} color={palette.heroInk} />
             <Text style={styles.heroBadgeText}>EXPLAINABLE AI</Text>
           </View>
           <Text style={styles.heroTitle}>每個提醒，都能說明依據。</Text>
@@ -114,7 +114,9 @@ export default function InsightsScreen() {
             <Fact value="8s" label="持續偏移" />
           </View>
         </View>
-        <AiOrb size={168} />
+        <View style={styles.aiPanel}>
+          <AiOrb size={168} />
+        </View>
       </LinearGradient>
 
       <View style={[styles.grid, isWide && styles.gridWide]}>
@@ -227,18 +229,19 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
     justifyContent: 'space-between',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#9583FF',
+    borderColor: palette.heroInk,
   },
   heroWide: { minHeight: 360, flexDirection: 'row', padding: Spacing.xxl },
   heroCopy: { flex: 1, alignItems: 'flex-start', gap: Spacing.md, maxWidth: 680 },
-  heroBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(7,10,26,0.3)', borderRadius: Radius.pill, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs },
-  heroBadgeText: { color: palette.white, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 1.2 },
-  heroTitle: { color: palette.white, fontFamily: Typography.family, fontSize: 36, lineHeight: 45, fontWeight: '900', letterSpacing: -1 },
-  heroLead: { color: '#EBEAFE', fontFamily: Typography.family, fontSize: Typography.body, lineHeight: 26, maxWidth: 620 },
+  heroBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,249,239,0.56)', borderRadius: Radius.pill, borderWidth: 1, borderColor: palette.heroInk, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs },
+  heroBadgeText: { color: palette.heroInk, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '800', letterSpacing: 1.2 },
+  heroTitle: { color: palette.heroInk, fontFamily: Typography.displayFamily, fontSize: 36, lineHeight: 45, fontWeight: '700', letterSpacing: -0.6 },
+  heroLead: { color: palette.heroInkSoft, fontFamily: Typography.family, fontSize: Typography.body, lineHeight: 26, maxWidth: 620 },
   heroFacts: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  fact: { minWidth: 102, borderRadius: Radius.md, padding: Spacing.sm, backgroundColor: 'rgba(7,10,26,0.28)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  factValue: { color: palette.white, fontFamily: Typography.family, fontSize: Typography.h2, fontWeight: '900' },
-  factLabel: { color: '#E2E8FF', fontFamily: Typography.family, fontSize: Typography.caption, marginTop: 2 },
+  fact: { minWidth: 102, borderRadius: Radius.md, padding: Spacing.sm, backgroundColor: 'rgba(255,249,239,0.48)', borderWidth: 1, borderColor: palette.heroInk },
+  factValue: { color: palette.heroInk, fontFamily: Typography.displayFamily, fontSize: Typography.h2, fontWeight: '700' },
+  factLabel: { color: palette.heroInkSoft, fontFamily: Typography.family, fontSize: Typography.caption, marginTop: 2 },
+  aiPanel: { padding: Spacing.sm, backgroundColor: 'rgba(255,249,239,0.34)', borderWidth: 1, borderColor: palette.heroInk },
   grid: { gap: Spacing.md },
   gridWide: { flexDirection: 'row' },
   coachCard: { flex: 1.3, gap: Spacing.md },
@@ -247,33 +250,33 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   wrapHeading: { flexWrap: 'wrap' },
   headingGrow: { flex: 1, minWidth: 210 },
   kicker: { color: palette.accent, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 1 },
-  cardTitle: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.h3, lineHeight: 25, fontWeight: '900', marginTop: 5 },
-  iconFrame: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: palette.accentPale, alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { color: palette.ink, fontFamily: Typography.displayFamily, fontSize: Typography.h3, lineHeight: 25, fontWeight: '700', marginTop: 5 },
+  iconFrame: { width: 48, height: 48, borderRadius: Radius.sm, backgroundColor: palette.accentPale, borderWidth: 1, borderColor: palette.accent, alignItems: 'center', justifyContent: 'center' },
   body: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.small, lineHeight: 22 },
   providerLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   providerText: { color: palette.primaryDark, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '800', flexShrink: 1 },
   readinessValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  readinessValue: { color: palette.ink, fontFamily: Typography.family, fontSize: 46, fontWeight: '900' },
+  readinessValue: { color: palette.ink, fontFamily: Typography.displayFamily, fontSize: 46, fontWeight: '700' },
   readinessTotal: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.body, fontWeight: '800' },
   progressTrack: { height: 10, borderRadius: Radius.pill, backgroundColor: palette.surfaceMuted, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: Radius.pill, backgroundColor: palette.accent },
   trendCard: { gap: Spacing.md },
   deltaPill: { borderRadius: Radius.md, backgroundColor: palette.accentPale, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, alignItems: 'flex-end' },
   deltaNegative: { backgroundColor: palette.warningPale },
-  deltaValue: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.h3, fontWeight: '900' },
+  deltaValue: { color: palette.ink, fontFamily: Typography.displayFamily, fontSize: Typography.h3, fontWeight: '700' },
   deltaLabel: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: 10, marginTop: 2 },
   chartCaption: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.caption, lineHeight: 19 },
   sectionHeading: { gap: 4 },
-  sectionTitle: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.h2, fontWeight: '900' },
+  sectionTitle: { color: palette.ink, fontFamily: Typography.displayFamily, fontSize: Typography.h2, fontWeight: '700' },
   sectionLead: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.small, lineHeight: 21 },
   pipeline: { gap: 0 },
   pipelineRow: { flexDirection: 'row', gap: Spacing.md, minHeight: 116 },
   pipelineRail: { width: 48, alignItems: 'center' },
-  pipelineIcon: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.accentPale, borderWidth: 1, borderColor: palette.accent },
+  pipelineIcon: { width: 44, height: 44, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.accentPale, borderWidth: 1, borderColor: palette.accent },
   pipelineLine: { width: 1, flex: 1, backgroundColor: palette.lineBright, marginVertical: 5 },
   pipelineCopy: { flex: 1, paddingBottom: Spacing.lg },
   pipelineIndex: { color: palette.primaryDark, fontFamily: 'monospace', fontSize: 11, fontWeight: '800' },
-  pipelineTitle: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.body, fontWeight: '900', marginTop: 4 },
+  pipelineTitle: { color: palette.ink, fontFamily: Typography.displayFamily, fontSize: Typography.body, fontWeight: '700', marginTop: 4 },
   pipelineText: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.caption, lineHeight: 19, marginTop: 4 },
   safetyLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.md },
   safetyText: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.caption, lineHeight: 18, flexShrink: 1 },

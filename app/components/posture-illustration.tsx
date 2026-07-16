@@ -49,6 +49,8 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
     aspectRatio: 1.18,
     backgroundColor: palette.primaryPale,
     borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: palette.primaryDark,
     overflow: 'hidden',
   },
 });

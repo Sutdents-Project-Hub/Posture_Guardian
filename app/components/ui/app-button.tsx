@@ -1,5 +1,4 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 
 import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
@@ -28,7 +27,7 @@ export function AppButton({
   style,
   accessibilityHint,
 }: Props) {
-  const { gradients, palette } = useAppTheme();
+  const { palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const isDisabled = disabled || loading;
   return (
@@ -47,26 +46,23 @@ export function AppButton({
         isDisabled && styles.disabled,
         style,
       ]}>
-      {variant === 'primary' ? (
-        <LinearGradient colors={gradients.primary} style={StyleSheet.absoluteFill} />
-      ) : null}
       <>
         {loading ? (
           <ActivityIndicator
             size="small"
-            color={variant === 'primary' || variant === 'danger' ? palette.white : palette.primaryDark}
+            color={variant === 'primary' ? palette.onPrimary : variant === 'danger' ? palette.white : palette.primaryDark}
           />
         ) : icon ? (
           <MaterialIcons
             name={icon}
             size={20}
-            color={variant === 'primary' || variant === 'danger' ? palette.white : palette.primaryDark}
+            color={variant === 'primary' ? palette.onPrimary : variant === 'danger' ? palette.white : palette.primaryDark}
           />
         ) : null}
         <Text
           style={[
             styles.label,
-            variant === 'primary' || variant === 'danger' ? styles.lightLabel : styles.darkLabel,
+            variant === 'primary' ? styles.primaryLabel : variant === 'danger' ? styles.lightLabel : styles.darkLabel,
           ]}>
           {label}
         </Text>
@@ -88,12 +84,12 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  primary: { backgroundColor: palette.primary, borderColor: '#8E7AFF' },
+  primary: { backgroundColor: palette.primary, borderColor: palette.primaryDark },
   secondary: { backgroundColor: palette.primaryPale, borderColor: palette.primaryDark },
   ghost: { backgroundColor: 'transparent', borderColor: palette.line },
   danger: { backgroundColor: palette.danger, borderColor: palette.danger },
   fullWidth: { width: '100%' },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
+  pressed: { opacity: 0.82, transform: [{ translateX: 2 }, { translateY: 2 }] },
   disabled: { opacity: 0.45 },
   label: {
     fontFamily: Typography.family,
@@ -101,5 +97,6 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
     fontWeight: '700',
   },
   lightLabel: { color: palette.white },
+  primaryLabel: { color: palette.onPrimary },
   darkLabel: { color: palette.primaryDark },
 });

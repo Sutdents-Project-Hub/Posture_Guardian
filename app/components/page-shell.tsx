@@ -101,14 +101,14 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
     fontFamily: Typography.family,
     color: palette.accent,
     fontSize: Typography.caption,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    fontWeight: '700',
+    letterSpacing: 1.4,
   },
   title: {
-    fontFamily: Typography.family,
+    fontFamily: Typography.displayFamily,
     color: palette.ink,
     fontSize: Typography.h2,
     lineHeight: 29,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });

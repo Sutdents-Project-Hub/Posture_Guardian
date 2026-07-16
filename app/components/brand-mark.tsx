@@ -23,8 +23,8 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   frame: {
     width: 40,
     height: 40,
-    borderRadius: 13,
-    borderWidth: 1.5,
+    borderRadius: Radius.sm,
+    borderWidth: 2,
     backgroundColor: palette.primaryPale,
     padding: 8,
     flexDirection: 'row',
@@ -32,9 +32,9 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
     justifyContent: 'space-between',
   },
   bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
-  bar: { width: 3, borderRadius: Radius.pill },
+  bar: { width: 3, borderRadius: 0 },
   short: { height: 10 },
   medium: { height: 15 },
   tall: { height: 20 },
-  dot: { width: 6, height: 6, borderRadius: 3, marginBottom: 1 },
+  dot: { width: 6, height: 6, borderRadius: 0, marginBottom: 1 },
 });

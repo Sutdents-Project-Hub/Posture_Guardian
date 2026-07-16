@@ -81,7 +81,11 @@ export default function HomeScreen() {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.hero, isWide && styles.heroWide]}>
-        <View style={styles.heroCopy}>
+        <View style={[styles.heroCopy, !isWide && styles.heroCopyNarrow]}>
+          <View style={styles.heroMeta}>
+            <Text style={styles.heroMetaText}>01 / POSTURE AWARENESS</Text>
+            <View style={styles.heroMetaLine} />
+          </View>
           <StatusPill label={STAGE_LABELS[interventionStage]} tone="info" />
           <Text style={[styles.display, !isWide && styles.displayNarrow]}>AI 看見偏移，{`\n`}你看見改變。</Text>
           <Text style={styles.lead}>
@@ -92,21 +96,23 @@ export default function HomeScreen() {
             <EvidenceChip icon="timer" label="10 秒基線" />
             <EvidenceChip icon="no-photography" label="影像不儲存" />
           </View>
-          <View style={styles.heroActions}>
+          <View style={[styles.heroActions, !isWide && styles.heroActionsNarrow]}>
             <AppButton
               label="開始側面偵測"
               icon="center-focus-strong"
+              fullWidth={!isWide}
               onPress={() => start('side')}
             />
             <AppButton
               label="試看展示模式"
               variant="secondary"
               icon="play-arrow"
+              fullWidth={!isWide}
               onPress={() => start('side', true)}
             />
           </View>
         </View>
-        <View style={styles.heroVisual}>
+        <View style={[styles.heroVisual, !isWide && styles.heroVisualNarrow]}>
           <AiOrb size={198} />
           <View style={styles.aiLiveBadge}>
             <View style={styles.aiLiveDot} />
@@ -273,28 +279,34 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   hero: { backgroundColor: palette.surface, padding: Spacing.lg, gap: Spacing.xl, overflow: 'hidden', borderRadius: Radius.lg, borderWidth: 1, borderColor: palette.lineBright },
   heroWide: { flexDirection: 'row', minHeight: 430, padding: Spacing.xxl, alignItems: 'center' },
   heroCopy: { flex: 1.15, alignItems: 'flex-start', gap: Spacing.lg },
+  heroCopyNarrow: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: '100%' },
+  heroMeta: { width: '100%', maxWidth: 310, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  heroMetaText: { fontFamily: 'monospace', color: palette.primary, fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
+  heroMetaLine: { height: 1, flex: 1, backgroundColor: palette.primary },
   display: {
-    fontFamily: Typography.family,
+    fontFamily: Typography.displayFamily,
     color: palette.ink,
     fontSize: Typography.display,
     lineHeight: 50,
-    fontWeight: '900',
-    letterSpacing: -1.3,
+    fontWeight: '700',
+    letterSpacing: -0.7,
   },
   displayNarrow: { fontSize: 34, lineHeight: 43 },
   lead: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.body, lineHeight: 27, maxWidth: 590 },
   heroActions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  heroActionsNarrow: { width: '100%', minHeight: 108, flexDirection: 'column', flexWrap: 'nowrap' },
   evidenceChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   evidenceChip: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.pill, paddingHorizontal: Spacing.sm, backgroundColor: palette.accentPale, borderWidth: 1, borderColor: palette.accent },
-  evidenceChipText: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '800' },
-  heroVisual: { flex: 0.85, alignItems: 'center', justifyContent: 'center', minHeight: 280 },
+  evidenceChipText: { color: palette.ink, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '700' },
+  heroVisual: { flex: 0.85, alignItems: 'center', justifyContent: 'center', minHeight: 280, backgroundColor: palette.surfaceMuted, borderWidth: 1, borderColor: palette.line, padding: Spacing.md },
+  heroVisualNarrow: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: '100%' },
   aiLiveBadge: { position: 'absolute', top: 18, left: 8, minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: Spacing.sm, borderRadius: Radius.pill, backgroundColor: palette.overlay, borderWidth: 1, borderColor: palette.lineBright },
-  aiLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.accent },
-  aiLiveText: { color: palette.accent, fontFamily: Typography.family, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  gaugeFloat: { position: 'absolute', right: 2, bottom: -4, padding: 5, borderRadius: Radius.pill, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.lineBright },
+  aiLiveDot: { width: 7, height: 7, borderRadius: 0, backgroundColor: palette.onDarkAccent },
+  aiLiveText: { color: palette.white, fontFamily: Typography.family, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  gaugeFloat: { position: 'absolute', right: 8, bottom: 8, padding: 5, borderRadius: Radius.sm, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.lineBright },
   sectionHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Spacing.md },
   eyebrow: { fontFamily: Typography.family, color: palette.primary, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 1 },
-  sectionTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h2, fontWeight: '900', marginTop: 4 },
+  sectionTitle: { fontFamily: Typography.displayFamily, color: palette.ink, fontSize: Typography.h2, fontWeight: '700', marginTop: 4 },
   sectionNote: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, textAlign: 'right', flexShrink: 1 },
   modeGrid: { gap: Spacing.md },
   modeGridWide: { flexDirection: 'row' },
@@ -305,31 +317,33 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
     borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: palette.line,
+    borderBottomWidth: 4,
+    borderBottomColor: palette.primary,
     padding: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.md,
   },
   pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
-  modeIcon: { width: 54, height: 54, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primaryPale },
+  modeIcon: { width: 54, height: 54, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primaryPale, borderWidth: 1, borderColor: palette.primaryDark },
   modeCopy: { flex: 1, gap: 4 },
   modeSubtitle: { fontFamily: Typography.family, color: palette.primary, fontSize: Typography.caption, fontWeight: '800' },
-  modeTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  modeTitle: { fontFamily: Typography.displayFamily, color: palette.ink, fontSize: Typography.h3, fontWeight: '700' },
   modeDescription: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, lineHeight: 21, marginTop: 5 },
-  arrowButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primary, alignSelf: 'flex-end' },
+  arrowButton: { width: 40, height: 40, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.primary, alignSelf: 'flex-end', borderWidth: 1, borderColor: palette.primaryDark },
   metricsGrid: { gap: Spacing.md },
   metricsGridWide: { flexDirection: 'row' },
   metricCard: { flex: 1, gap: Spacing.sm, minHeight: 150 },
   metricLabel: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, fontWeight: '700' },
   metricValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  metricValue: { fontFamily: Typography.family, color: palette.ink, fontSize: 34, fontWeight: '900' },
+  metricValue: { fontFamily: Typography.displayFamily, color: palette.ink, fontSize: 34, fontWeight: '700' },
   metricUnit: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, fontWeight: '700' },
   coach: { gap: Spacing.md, alignItems: 'flex-start' },
   coachWide: { flexDirection: 'row', alignItems: 'center', padding: Spacing.xl },
-  coachIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.accentPale },
+  coachIcon: { width: 54, height: 54, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.accentPale, borderWidth: 1, borderColor: palette.accent },
   coachCopy: { flex: 1, gap: 5 },
   coachEyebrow: { fontFamily: Typography.family, color: palette.accent, fontSize: Typography.caption, fontWeight: '900', letterSpacing: 0.8 },
-  coachTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.h3, fontWeight: '900' },
+  coachTitle: { fontFamily: Typography.displayFamily, color: palette.ink, fontSize: Typography.h3, fontWeight: '700' },
   coachText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, lineHeight: 22 },
   privacyLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.md },
   privacyText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 18, flexShrink: 1 },
