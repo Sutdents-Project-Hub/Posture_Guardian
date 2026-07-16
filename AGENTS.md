@@ -102,7 +102,7 @@
 
 ## Git、Commit 與 Pull Request
 
-- 目前本機 repository 已在 `main` 建立初始化 commit `71a3b1d`，且未設定 remote；決賽 MVP 的程式與文件變更仍在 worktree，未經使用者要求不得自行提交。
+- 目前 repository 已在 `main` 建立初始化 commit `71a3b1d`，並設定 GitHub remote；決賽 MVP 的程式與文件變更未經使用者要求不得自行提交。
 - 全新專案初始化的固定例外是：執行 `git init -b main`，安全掃描通過後只 stage 初始化產物，並建立 `chore(init): 初始化學生專案結構`。既有 Git repository 不適用此例外。
 - 除上述固定初始 commit 外，只有使用者明確要求時才可 commit、push、建立 PR、merge、release 或部署；各項授權彼此獨立。
 - 每次 branch、commit、merge、push 或 PR 前，先執行 `git status --short --branch`、`git branch --show-current` 與 `git remote -v`，確認目前分支、working tree、變更範圍、remote 與本次授權。
