@@ -2,17 +2,21 @@
 
 from datetime import datetime, timedelta
 
-from posture_guardian_api.insights import InsightInput, fallback_insight
+from posture_guardian_api.insights import InsightInput, fallback_insight, validate_model_insight
 from posture_guardian_api.schemas import InterventionStage, SessionSummary, ViewMode
 from posture_guardian_api.sessions import evaluate_stage
 
 
-def summary(index: int, good_rate: float) -> SessionSummary:
+def summary(
+    index: int,
+    good_rate: float,
+    stage: InterventionStage = InterventionStage.STARTER,
+) -> SessionSummary:
     started = datetime.now().astimezone() - timedelta(days=index)
     return SessionSummary(
         id=str(index),
         view_mode=ViewMode.SIDE,
-        intervention_stage=InterventionStage.STARTER,
+        intervention_stage=stage,
         started_at=started,
         ended_at=started + timedelta(minutes=10),
         valid_seconds=600,
@@ -65,6 +69,60 @@ def test_stage_decreases_after_ten_point_improvement() -> None:
     stage, _ = evaluate_stage(newest_first, InterventionStage.ADVANCED)
 
     assert stage is InterventionStage.STARTER
+
+
+def test_stage_waits_until_three_sessions_after_a_stage_change() -> None:
+    newest_first = [
+        summary(0, 55, InterventionStage.ADVANCED),
+        summary(1, 56, InterventionStage.ADVANCED),
+        summary(2, 62),
+        summary(3, 60),
+        summary(4, 61),
+        summary(5, 60),
+        summary(6, 60),
+        summary(7, 60),
+    ]
+
+    stage, reason = evaluate_stage(newest_first, InterventionStage.ADVANCED)
+
+    assert stage is InterventionStage.ADVANCED
+    assert "2/3 次" in reason
+
+
+def test_stage_can_change_again_only_on_the_ninth_qualified_session() -> None:
+    initial = [summary(index, 60) for index in range(6)]
+    stage, _ = evaluate_stage(initial, InterventionStage.STARTER)
+    assert stage is InterventionStage.ADVANCED
+
+    after_seven = [summary(0, 55, InterventionStage.ADVANCED), *initial]
+    stage, _ = evaluate_stage(after_seven, InterventionStage.ADVANCED)
+    assert stage is InterventionStage.ADVANCED
+
+    after_eight = [
+        summary(0, 55, InterventionStage.ADVANCED),
+        summary(1, 56, InterventionStage.ADVANCED),
+        *initial,
+    ]
+    stage, _ = evaluate_stage(after_eight, InterventionStage.ADVANCED)
+    assert stage is InterventionStage.ADVANCED
+
+    after_nine = [
+        summary(0, 55, InterventionStage.ADVANCED),
+        summary(1, 56, InterventionStage.ADVANCED),
+        summary(2, 54, InterventionStage.ADVANCED),
+        *initial,
+    ]
+    stage, _ = evaluate_stage(after_nine, InterventionStage.ADVANCED)
+    assert stage is InterventionStage.INTENSIVE
+
+
+def test_model_insight_rejects_medical_or_malformed_output() -> None:
+    assert validate_model_insight("診斷：你已罹患脊椎疾病，請接受治療。") is None
+    assert validate_model_insight("只有一段沒有固定結構的建議") is None
+    assert (
+        validate_model_insight("趨勢：資料仍不足｜下一步：調高螢幕｜下次目標：觀察 10 分鐘")
+        is not None
+    )
 
 
 def test_fallback_insight_explains_long_term_trend() -> None:

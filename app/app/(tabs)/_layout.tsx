@@ -37,6 +37,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: '首頁',
+          tabBarAccessibilityLabel: '首頁',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
@@ -44,6 +45,7 @@ export default function TabLayout() {
         name="insights"
         options={{
           title: 'AI 洞察',
+          tabBarAccessibilityLabel: 'AI 洞察',
           tabBarIcon: ({ color }) => <IconSymbol size={27} name="sparkles" color={color} />,
         }}
       />
@@ -51,6 +53,7 @@ export default function TabLayout() {
         name="history"
         options={{
           title: '趨勢',
+          tabBarAccessibilityLabel: '趨勢',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
         }}
       />
@@ -58,6 +61,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: '設定',
+          tabBarAccessibilityLabel: '設定',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
         }}
       />

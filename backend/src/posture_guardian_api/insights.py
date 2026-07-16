@@ -1,10 +1,24 @@
 """Personalized session guidance with Microsoft Foundry and deterministic fallback."""
 
+import logging
+import time
 from dataclasses import dataclass
 
 from openai import AsyncOpenAI
 
 from posture_guardian_api.config import Settings
+
+PROMPT_VERSION = "posture-coach-v1"
+logger = logging.getLogger(__name__)
+DISALLOWED_GUIDANCE_TERMS = (
+    "診斷",
+    "罹患",
+    "疾病",
+    "治療",
+    "療效",
+    "脊椎側彎",
+    "受傷機率",
+)
 
 
 @dataclass(frozen=True)
@@ -54,6 +68,19 @@ def fallback_insight(data: InsightInput) -> str:
     )
 
 
+def validate_model_insight(raw: str) -> str | None:
+    """Accept only the short, non-medical three-part contract shown in the UI."""
+    text = " ".join(raw.split())
+    required_sections = ("趨勢：", "下一步：", "下次目標：")
+    if not text or len(text) > 120:
+        return None
+    if not all(section in text for section in required_sections):
+        return None
+    if any(term in text for term in DISALLOWED_GUIDANCE_TERMS):
+        return None
+    return text
+
+
 async def generate_insight(data: InsightInput, settings: Settings) -> tuple[str, str]:
     """Use Foundry when configured; always return a local fallback on failure."""
     if not settings.foundry_configured:
@@ -61,7 +88,12 @@ async def generate_insight(data: InsightInput, settings: Settings) -> tuple[str,
 
     endpoint = settings.azure_foundry_endpoint.rstrip("/")
     base_url = endpoint if endpoint.endswith("/openai/v1") else f"{endpoint}/openai/v1"
-    client = AsyncOpenAI(api_key=settings.azure_foundry_api_key, base_url=base_url)
+    client = AsyncOpenAI(
+        api_key=settings.azure_foundry_api_key,
+        base_url=base_url,
+        timeout=8.0,
+        max_retries=0,
+    )
     previous_average = (
         data.previous_three_average if data.previous_three_average is not None else "不足"
     )
@@ -80,16 +112,39 @@ async def generate_insight(data: InsightInput, settings: Settings) -> tuple[str,
         f"前三次平均={previous_average}; 最近三次平均={recent_average}; "
         f"改善百分點={improvement}"
     )
+    started_at = time.perf_counter()
     try:
         response = await client.responses.create(
             model=settings.azure_foundry_model,
             input=prompt,
             max_output_tokens=180,
         )
-        text = response.output_text.strip()
+        text = validate_model_insight(response.output_text)
         if text:
+            latency_ms = round((time.perf_counter() - started_at) * 1000)
+            logger.info(
+                "foundry_insight_success model=%s prompt_version=%s latency_ms=%d request_id=%s",
+                getattr(response, "model", None) or settings.azure_foundry_model,
+                PROMPT_VERSION,
+                latency_ms,
+                getattr(response, "_request_id", None) or "unavailable",
+            )
             return text, "foundry"
-    except Exception:
+        logger.warning(
+            "foundry_insight_fallback model=%s prompt_version=%s latency_ms=%d "
+            "error_type=OutputContractRejected",
+            settings.azure_foundry_model,
+            PROMPT_VERSION,
+            round((time.perf_counter() - started_at) * 1000),
+        )
+    except Exception as exc:
         # Cloud access must never break the live posture session or contest demo.
-        pass
+        logger.warning(
+            "foundry_insight_fallback model=%s prompt_version=%s error_type=%s",
+            settings.azure_foundry_model,
+            PROMPT_VERSION,
+            type(exc).__name__,
+        )
+    finally:
+        await client.close()
     return fallback_insight(data), "fallback"

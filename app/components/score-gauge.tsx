@@ -8,10 +8,12 @@ export function ScoreGauge({
   value,
   size = 132,
   label = '姿勢分數',
+  unit = '分',
 }: {
   value: number | null;
   size?: number;
   label?: string;
+  unit?: string;
 }) {
   const { palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
@@ -26,7 +28,7 @@ export function ScoreGauge({
   return (
     <View
       accessibilityRole="text"
-      accessibilityLabel={hasValue ? `${label} ${Math.round(normalized)} 分` : `${label}尚無資料`}
+      accessibilityLabel={hasValue ? `${label} ${Math.round(normalized)} ${unit}` : `${label}尚無資料`}
       style={{ width: size, height: size }}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Circle

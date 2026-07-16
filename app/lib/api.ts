@@ -25,25 +25,38 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      ...init?.headers,
-    },
-  });
-  if (!response.ok) {
-    let detail = `伺服器回應 ${response.status}`;
-    try {
-      const body = (await response.json()) as { detail?: string };
-      detail = body.detail || detail;
-    } catch {
-      // Keep the status-based message when a proxy returns non-JSON content.
+async function request<T>(path: string, init?: RequestInit, timeoutMs = 8000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        ...init?.headers,
+      },
+    });
+    if (!response.ok) {
+      let detail = `伺服器回應 ${response.status}`;
+      try {
+        const body = (await response.json()) as { detail?: string };
+        detail = body.detail || detail;
+      } catch {
+        // Keep the status-based message when a proxy returns non-JSON content.
+      }
+      throw new ApiError(detail, response.status);
     }
-    throw new ApiError(detail, response.status);
+    return (await response.json()) as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError('連線逾時，已切換到可用的本地流程。');
+    }
+    throw new ApiError('目前無法連線到姿勢分析服務。');
+  } finally {
+    clearTimeout(timer);
   }
-  return (await response.json()) as T;
 }
 
 export async function getHealth(): Promise<HealthResponse> {
@@ -97,7 +110,7 @@ export async function addSessionSample(sessionId: string, sample: SessionSample)
 }
 
 export async function completeSession(sessionId: string): Promise<SessionCompleteResponse> {
-  return request(`/api/v1/sessions/${sessionId}/complete`, { method: 'POST' });
+  return request(`/api/v1/sessions/${sessionId}/complete`, { method: 'POST' }, 12_000);
 }
 
 export async function submitSessionFeedback(

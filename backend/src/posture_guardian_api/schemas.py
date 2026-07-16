@@ -1,10 +1,11 @@
 """Pydantic request and response contracts."""
 
+import math
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ViewMode(StrEnum):
@@ -50,13 +51,31 @@ class AnalysisResponse(BaseModel):
     message: str
 
 
-class SessionCreate(BaseModel):
+class StrictInputModel(BaseModel):
+    """Reject non-finite JSON numbers in public request bodies."""
+
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
+
+
+class SessionCreate(StrictInputModel):
     """Create a calibrated work session."""
 
     profile_id: Annotated[str, Field(min_length=8, max_length=64)]
     view_mode: ViewMode
     intervention_stage: InterventionStage = InterventionStage.STARTER
     baseline: dict[str, float]
+
+    @model_validator(mode="after")
+    def validate_baseline(self) -> Self:
+        expected = {
+            ViewMode.SIDE: {"neck_flexion", "trunk_flexion"},
+            ViewMode.FRONT: {"head_tilt", "shoulder_tilt", "trunk_lateral"},
+        }[self.view_mode]
+        if set(self.baseline) != expected:
+            raise ValueError("baseline 欄位與所選視角不一致")
+        if any(not math.isfinite(value) or abs(value) > 180 for value in self.baseline.values()):
+            raise ValueError("baseline 角度必須是 -180 到 180 的有限數字")
+        return self
 
 
 class SessionCreated(BaseModel):
@@ -66,7 +85,7 @@ class SessionCreated(BaseModel):
     started_at: datetime
 
 
-class SampleCreate(BaseModel):
+class SampleCreate(StrictInputModel):
     """Persist derived values from one observation interval."""
 
     duration_seconds: Annotated[float, Field(gt=0, le=5)] = 0.5
@@ -76,7 +95,16 @@ class SampleCreate(BaseModel):
     posture_score: Annotated[float, Field(ge=0, le=100)] = 0
     metrics: dict[str, float] = Field(default_factory=dict)
     deviations: dict[str, float] = Field(default_factory=dict)
-    reasons: list[str] = Field(default_factory=list)
+    reasons: list[Annotated[str, Field(max_length=64)]] = Field(default_factory=list, max_length=5)
+
+    @field_validator("metrics", "deviations")
+    @classmethod
+    def validate_metric_map(cls, value: dict[str, float]) -> dict[str, float]:
+        if len(value) > 5:
+            raise ValueError("姿勢指標欄位過多")
+        if any(not math.isfinite(item) or abs(item) > 180 for item in value.values()):
+            raise ValueError("姿勢指標必須是 -180 到 180 的有限數字")
+        return value
 
 
 class SampleAccepted(BaseModel):
@@ -144,3 +172,5 @@ class HealthResponse(BaseModel):
     database: Literal["ok", "error"]
     pose_model: Literal["ready", "missing"]
     insight_provider: Literal["foundry", "fallback"]
+    insight_model: str | None
+    insight_prompt_version: str

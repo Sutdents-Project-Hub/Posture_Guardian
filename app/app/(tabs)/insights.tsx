@@ -1,4 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -81,10 +81,10 @@ export default function InsightsScreen() {
   const providerLabel = actualProvider === 'foundry'
     ? '最近一次 Foundry 成功'
     : actualProvider
-      ? '最近一次使用本地 fallback'
+      ? '最近一次使用規則式 fallback'
       : health?.insight_provider === 'foundry'
         ? 'Foundry 已設定，等待首次呼叫'
-        : '目前為本地 fallback';
+        : '目前為規則式 fallback';
   const delta = trend.improvement;
 
   return (
@@ -135,8 +135,13 @@ export default function InsightsScreen() {
             <MaterialIcons name="verified" size={17} color={palette.primaryDark} />
             <Text style={styles.providerText}>{providerLabel}</Text>
           </View>
+          <View style={styles.auditGrid}>
+            <AuditFact label="模型部署" value={health?.insight_model || '尚未設定'} />
+            <AuditFact label="Prompt 契約" value={health?.insight_prompt_version || 'posture-coach-v1'} />
+            <AuditFact label="輸入邊界" value="去識別摘要" />
+          </View>
           <AppButton
-            label="開始 5 分鐘觀察"
+            label="開始 10 分鐘觀察"
             icon="play-arrow"
             onPress={() => router.push({ pathname: '/session', params: { mode: 'side', demo: '0' } })}
           />
@@ -219,6 +224,16 @@ function Fact({ value, label }: { value: string; label: string }) {
   );
 }
 
+function AuditFact({ label, value }: { label: string; value: string }) {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.auditFact}>
+      <Text style={styles.auditLabel}>{label}</Text>
+      <Text style={styles.auditValue}>{value}</Text>
+    </View>
+  );
+}
+
 const createStyles = (palette: ThemePalette) => StyleSheet.create({
   hero: {
     minHeight: 390,
@@ -255,6 +270,10 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   body: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.small, lineHeight: 22 },
   providerLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   providerText: { color: palette.primaryDark, fontFamily: Typography.family, fontSize: Typography.caption, fontWeight: '800', flexShrink: 1 },
+  auditGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  auditFact: { minWidth: 136, flexGrow: 1, gap: 3, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.canvasRaised, padding: Spacing.sm },
+  auditLabel: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: 10, fontWeight: '700' },
+  auditValue: { color: palette.ink, fontFamily: 'monospace', fontSize: Typography.caption, fontWeight: '800' },
   readinessValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
   readinessValue: { color: palette.ink, fontFamily: Typography.displayFamily, fontSize: 46, fontWeight: '700' },
   readinessTotal: { color: palette.inkSoft, fontFamily: Typography.family, fontSize: Typography.body, fontWeight: '800' },

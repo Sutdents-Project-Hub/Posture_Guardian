@@ -1,4 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { PageShell } from '@/components/page-shell';
@@ -75,6 +75,7 @@ export default function SettingsScreen() {
                 accessibilityRole="radio"
                 accessibilityLabel={option.title}
                 accessibilityState={{ checked: selected }}
+                aria-checked={selected}
                 onPress={() => void setThemePreference(option.value)}
                 style={({ pressed }) => [
                   styles.themeOption,
@@ -126,7 +127,7 @@ export default function SettingsScreen() {
                 <Text style={styles.stageText}>{stage.description}</Text>
               </View>
               <AppButton
-                label={selected ? '已選擇' : '選擇'}
+                label={selected ? `已選擇${stage.title}` : `選擇${stage.title}`}
                 variant={selected ? 'ghost' : 'secondary'}
                 disabled={selected}
                 onPress={() => void setInterventionStage(stage.value)}

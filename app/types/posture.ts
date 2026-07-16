@@ -31,6 +31,8 @@ export type HealthResponse = {
   database: 'ok' | 'error';
   pose_model: 'ready' | 'missing';
   insight_provider: 'foundry' | 'fallback';
+  insight_model: string | null;
+  insight_prompt_version: string;
 };
 
 export type SessionSummary = {

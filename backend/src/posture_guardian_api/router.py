@@ -3,15 +3,27 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from posture_guardian_api.config import get_settings
 from posture_guardian_api.database import get_db
+from posture_guardian_api.insights import PROMPT_VERSION
 from posture_guardian_api.models import PostureSample, PostureSession, SessionFeedback
 from posture_guardian_api.posture import (
+    REASON_LABELS,
     THRESHOLDS,
     PoseAnalyzer,
     PoseInputError,
@@ -42,8 +54,14 @@ pose_analyzer = PoseAnalyzer(settings.pose_model_path)
 DatabaseDep = Annotated[AsyncSession, Depends(get_db)]
 
 
+@router.get("/live", tags=["meta"])
+async def live() -> dict[str, str]:
+    """Return process liveness without checking downstream dependencies."""
+    return {"status": "ok"}
+
+
 @router.get("/health", response_model=HealthResponse, tags=["meta"])
-async def health(db: DatabaseDep) -> HealthResponse:
+async def health(response: Response, db: DatabaseDep) -> HealthResponse:
     """Check the database, local model bundle, and configured insight provider."""
     database_status = "ok"
     try:
@@ -52,11 +70,15 @@ async def health(db: DatabaseDep) -> HealthResponse:
         database_status = "error"
     model_status = "ready" if pose_analyzer.ready else "missing"
     overall = "ok" if database_status == "ok" and model_status == "ready" else "degraded"
+    if overall == "degraded":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return HealthResponse(
         status=overall,
         database=database_status,
         pose_model=model_status,
         insight_provider="foundry" if settings.foundry_configured else "fallback",
+        insight_model=settings.azure_foundry_model if settings.foundry_configured else None,
+        insight_prompt_version=PROMPT_VERSION,
     )
 
 
@@ -81,6 +103,8 @@ async def analyze_posture(
 
     try:
         parsed_baseline = parse_baseline(baseline)
+        if parsed_baseline is not None and set(parsed_baseline) != set(THRESHOLDS[view_mode]):
+            raise PoseInputError("baseline 欄位與所選視角不一致。")
         landmarks = await run_in_threadpool(pose_analyzer.detect, image_bytes)
         if not landmarks:
             return AnalysisResponse(
@@ -144,6 +168,13 @@ async def add_sample(
         raise HTTPException(status_code=404, detail="找不到工作階段。")
     if session.ended_at is not None:
         raise HTTPException(status_code=409, detail="工作階段已結束。")
+    expected_metrics = set(THRESHOLDS[ViewMode(session.view_mode)])
+    if not set(payload.metrics).issubset(expected_metrics):
+        raise HTTPException(status_code=422, detail="metrics 欄位與工作階段視角不一致。")
+    if not set(payload.deviations).issubset(expected_metrics):
+        raise HTTPException(status_code=422, detail="deviations 欄位與工作階段視角不一致。")
+    if not set(payload.reasons).issubset(REASON_LABELS.values()):
+        raise HTTPException(status_code=422, detail="reasons 包含不支援的姿勢事件。")
     db.add(
         PostureSample(
             session_id=session_id,

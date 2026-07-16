@@ -55,6 +55,18 @@ def evaluate_stage(
         remaining = 6 - len(qualified)
         return current, f"還需要 {remaining} 次至少 10 分鐘的有效階段，才會自動調整提醒強度。"
 
+    consecutive_current_stage = 0
+    for item in qualified:
+        if item.intervention_stage != current:
+            break
+        consecutive_current_stage += 1
+    completed_in_batch = consecutive_current_stage % 3
+    if completed_in_batch:
+        return (
+            current,
+            f"目前提醒階段已完成 {completed_in_batch}/3 次合格觀察；每三次最多調整一階。",
+        )
+
     recent = qualified[:3]
     previous = qualified[3:6]
     recent_good = sum(item.good_posture_rate for item in recent) / 3

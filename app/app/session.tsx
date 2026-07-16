@@ -1,4 +1,5 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { usePreventRemove } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -34,6 +35,13 @@ import {
 } from '@/lib/api';
 import { createDemoAnalysis } from '@/lib/demo';
 import { formatDuration, STAGE_LABELS, VIEW_LABELS } from '@/lib/format';
+import {
+  advanceEventWindow,
+  EMPTY_EVENT_WINDOW,
+  smoothAnalysis,
+  type DeviationFrame,
+  type PostureEventWindow,
+} from '@/lib/posture-window';
 import { useWideLayout } from '@/hooks/use-wide-layout';
 import type {
   AnalysisResponse,
@@ -99,8 +107,8 @@ export default function SessionScreen() {
   const calibrationTotalRef = useRef(0);
   const activeStartedRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
-  const attentionSinceRef = useRef<number | null>(null);
-  const goodSinceRef = useRef<number | null>(null);
+  const eventWindowRef = useRef<PostureEventWindow>(EMPTY_EVENT_WINDOW);
+  const deviationFramesRef = useRef<DeviationFrame[]>([]);
   const invalidSinceRef = useRef<number | null>(null);
   const eventActiveRef = useRef(false);
   const lastReminderRef = useRef(0);
@@ -120,8 +128,8 @@ export default function SessionScreen() {
     calibrationFramesRef.current = [];
     calibrationTotalRef.current = 0;
     sessionIdRef.current = null;
-    attentionSinceRef.current = null;
-    goodSinceRef.current = null;
+    eventWindowRef.current = EMPTY_EVENT_WINDOW;
+    deviationFramesRef.current = [];
     invalidSinceRef.current = null;
     eventActiveRef.current = false;
     lastReminderRef.current = 0;
@@ -234,7 +242,13 @@ export default function SessionScreen() {
       processingRef.current = true;
       const now = Date.now();
       try {
-        const result = await captureResult(now);
+        const captured = await captureResult(now);
+        const smoothed =
+          phase === 'active'
+            ? smoothAnalysis(captured, deviationFramesRef.current, now)
+            : { analysis: captured, frames: deviationFramesRef.current };
+        const result = smoothed.analysis;
+        deviationFramesRef.current = smoothed.frames;
         if (!mounted) return;
         setAnalysis(result);
         setMessage(null);
@@ -260,6 +274,12 @@ export default function SessionScreen() {
         if (!result.valid) {
           invalidSecondsRef.current += sampleDuration;
           invalidSinceRef.current ??= now;
+          const nextEvent = advanceEventWindow(eventWindowRef.current, {
+            valid: false,
+            attention: false,
+            durationSeconds: sampleDuration,
+          }, { attentionSeconds: ATTENTION_SECONDS, recoverySeconds: RECOVERY_SECONDS });
+          eventWindowRef.current = nextEvent.state;
           if (now - invalidSinceRef.current >= 5000) {
             setMessage('已連續 5 秒看不到必要節點，請調整相機或坐回畫面中央。');
           }
@@ -269,16 +289,21 @@ export default function SessionScreen() {
           scoreTotalRef.current += result.posture_score;
           scoreCountRef.current += 1;
           const thresholdExceeded = result.status === 'attention';
+          const nextEvent = advanceEventWindow(eventWindowRef.current, {
+            valid: true,
+            attention: thresholdExceeded,
+            durationSeconds: sampleDuration,
+          }, { attentionSeconds: ATTENTION_SECONDS, recoverySeconds: RECOVERY_SECONDS });
+          eventWindowRef.current = nextEvent.state;
 
           if (thresholdExceeded) {
-            goodSinceRef.current = null;
-            attentionSinceRef.current ??= now;
-            const attentionDuration = (now - attentionSinceRef.current) / 1000;
-            setReminderCountdown(Math.max(0, Math.ceil(ATTENTION_SECONDS - attentionDuration)));
+            setReminderCountdown(
+              Math.max(0, Math.ceil(ATTENTION_SECONDS - nextEvent.state.attentionSeconds)),
+            );
             for (const reason of result.reasons) {
               issueCountsRef.current[reason] = (issueCountsRef.current[reason] || 0) + 1;
             }
-            if (attentionDuration >= ATTENTION_SECONDS && !eventActiveRef.current) {
+            if (nextEvent.activated) {
               eventActiveRef.current = true;
               eventCountRef.current += 1;
               lastReminderRef.current = now;
@@ -286,15 +311,10 @@ export default function SessionScreen() {
               await triggerReminder();
             }
           } else {
-            attentionSinceRef.current = null;
             setReminderCountdown(null);
-            if (eventActiveRef.current) {
-              goodSinceRef.current ??= now;
-              if ((now - goodSinceRef.current) / 1000 >= RECOVERY_SECONDS) {
-                eventActiveRef.current = false;
-                goodSinceRef.current = null;
-                setEventActive(false);
-              }
+            if (nextEvent.recovered) {
+              eventActiveRef.current = false;
+              setEventActive(false);
             }
           }
 
@@ -368,7 +388,9 @@ export default function SessionScreen() {
       good_posture_rate: goodRate,
       primary_issue: primaryIssue,
       insight_text:
-        goodRate >= 75
+        valid < 60
+          ? '這次有效資料較短；下次先完成 10 分鐘觀察，再判讀是否穩定回到個人基線。'
+          : goodRate >= 75
           ? '已能穩定回到個人基線；接下來維持舒服坐姿，並每 25–30 分鐘起身活動。'
           : `主要偏移是「${primaryIssue || '姿勢角度'}」。先休息 5 分鐘並調整螢幕與座椅，再重新校準。`,
       insight_provider: 'fallback',
@@ -401,6 +423,13 @@ export default function SessionScreen() {
     }
     setPhase('summary');
   }
+
+  usePreventRemove(phase === 'active', () => {
+    Alert.alert('要結束這次觀察嗎？', '系統會先整理目前已有的有效資料。', [
+      { text: '繼續觀察', style: 'cancel' },
+      { text: '結束並查看摘要', onPress: () => void finish() },
+    ]);
+  });
 
   function close() {
     if (phase === 'active') {
@@ -598,6 +627,14 @@ function SetupPanel({
           <MaterialIcons name="check-circle" size={20} color={palette.success} />
           <Text style={styles.checkText}>校準後若移動相機或換座位，請重新開始。</Text>
         </View>
+        <View style={styles.checkRow}>
+          <MaterialIcons name="shield" size={20} color={palette.success} />
+          <Text style={styles.checkText}>
+            {demo
+              ? '展示模式不會使用或傳送相機影格，也不會納入正式趨勢。'
+              : '低解析影格會暫時傳到 API 做骨架推論，完成後立即釋放且不保存。'}
+          </Text>
+        </View>
       </View>
       {message ? (
         <View style={styles.errorBox}>
@@ -740,7 +777,7 @@ function SummaryView({
         <Surface style={styles.summaryHero}>
           <StatusPill label="工作階段已完成" tone="success" />
           <Text style={styles.summaryHeading}>更快察覺變化，就是這次的進步。</Text>
-          <ScoreGauge value={summary.good_posture_rate} size={160} label="良好坐姿率" />
+          <ScoreGauge value={summary.good_posture_rate} size={160} label="良好坐姿率" unit="%" />
           <Text style={styles.summaryCaption}>有效時間內，未處於持續姿勢事件的比例</Text>
         </Surface>
         <View style={styles.summaryMetrics}>
@@ -754,7 +791,11 @@ function SummaryView({
           </View>
           <View style={styles.summaryInsightCopy}>
             <Text style={styles.summaryInsightEyebrow}>
-              {summary.insight_provider === 'foundry' ? 'MICROSOFT FOUNDRY 建議' : '規則式離線建議'}
+              {summary.insight_provider === 'foundry'
+                ? 'MICROSOFT FOUNDRY 建議'
+                : summary.id.startsWith('local-')
+                  ? '規則式離線建議'
+                  : '規則式備援建議'}
             </Text>
             <Text style={styles.summaryInsightText}>{summary.insight_text}</Text>
           </View>
@@ -808,6 +849,7 @@ function FeedbackChoice({ label, selected, onPress }: { label: string; selected:
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       accessibilityLabel={label}
       onPress={onPress}
       style={({ pressed }) => [

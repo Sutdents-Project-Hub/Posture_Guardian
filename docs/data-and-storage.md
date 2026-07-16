@@ -14,7 +14,7 @@
 | `posture_sessions`（已實作） | 匿名 profile、基線、時間、比例、提醒、建議 | 行為／人體衍生資料 | 否 |
 | `posture_samples`（已實作） | 約每影格的角度、偏移、分數與事件狀態 | 人體衍生資料 | 否 |
 | 本機 AsyncStorage（已實作） | 匿名識別碼、提醒階段與震動偏好 | 個人偏好 | 否 |
-| consent／provider audit（待實作） | 正式測試同意、prompt version 與 Azure 呼叫證據 | 法務／AI 稽核 | 否 |
+| AI provider audit（部分已實作） | session provider、設定中的 model／prompt version 與結構化呼叫 log；正式同意與長期稽核表仍待實作 | 法務／AI 稽核 | 否 |
 
 正式實作前需再決定是否真的需要帳號；若決賽 MVP 使用單機匿名模式，就不建立不必要的使用者身份表。
 

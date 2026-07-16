@@ -10,7 +10,7 @@
 ## 目前 MVP 的真實狀態
 
 - 使用匿名本機 profile，沒有姓名、學校、Email 或密碼登入。
-- 相機影格以 multipart 暫存送到 API，限制 image MIME 與 5 MB；推論完成即釋放。
+- 相機影格以 multipart 暫存送到 API，限制 image MIME、5 MB 與 1,200 萬像素；推論完成即釋放。
 - 資料庫只保存衍生角度、事件與摘要；設定頁可刪除該 profile 的伺服器資料。
 - Foundry provider 只接收工作階段彙總；沒有 server-side 憑證時不做外部 AI 呼叫。
 - `.env.example` 只有安全預設與變數名稱；真實 secret 不得提交。
@@ -24,14 +24,14 @@
 | 未成年資料被過度蒐集 | 匿名模式優先；需要帳號或聯絡人時再取得明確同意 |
 | 聯絡人變成監控 | 預設關閉，只傳摘要，不傳即時影像；可查看收件人與撤回 |
 | AI 產生錯誤健康建議 | 輸入限制為摘要、輸出套用安全模板、標示來源、禁止診斷語句 |
-| 越權讀取他人紀錄 | 若加入帳號，API 必須以 server-side authorization 驗證每筆資源 |
+| 越權讀取他人紀錄 | 目前匿名 API 只適用受控決賽 demo；若公開給多位使用者，必須先加入身份、每筆資源授權與 rate limit |
 | Demo 洩漏真實資料 | 使用去識別測試帳號與同意素材；畫面、log、簡報與 repository 都檢查 |
 
 ## 相機與上傳規則
 
 - 權限前先說明用途與是否離開裝置／瀏覽器。
 - 畫面只取完成姿態推論所需解析度與頻率。
-- API 已限制 image MIME 與 5 MB；production reverse proxy 仍需補 request timeout 與像素尺寸上限。
+- API 已限制 image MIME、5 MB 與 1,200 萬像素，client 請求有 8 秒 timeout；production reverse proxy 仍需補 request timeout、body limit 與 rate limit。
 - 原始影格不可傳送給生成式 AI provider。
 - debug 模式也不得把 base64 或可還原影像的資料寫入 log；API 回傳 landmarks 供即時 overlay，但資料庫不保存 landmarks 全量。
 
@@ -52,3 +52,4 @@
 - [ ] API error 不回傳 stack trace、prompt、connection string 或 provider response 原文。
 - [ ] demo 帳號、簡報截圖與 log 已去識別。
 - [ ] 資料刪除與同意撤回流程有人工驗收。
+- [ ] 若服務可由公開網路存取，已使用 Coolify／反向代理存取控制保護 demo API；正式多使用者版另有身份、ownership 與 rate limit。

@@ -29,8 +29,10 @@ Azure 概念驗證改為：
 
 1. 將去識別的工作階段摘要送到 Microsoft Foundry 模型。
 2. 目前以 Responses API 產生 120 字內「趨勢｜下一步｜下次目標」中性繁中建議，資料不足時不得假設改善。
-3. 工作階段保存 provider；模型、prompt version 與 latency audit 尚待 Azure PoC 補齊。
+3. 工作階段保存 provider；API health 暴露設定中的模型與 `posture-coach-v1` prompt version，成功／fallback 結構化 log 記錄 model、prompt version、latency、request id 與錯誤型別，不記錄 prompt、回應原文或 secret。
 4. 決賽展示 Azure resource、一次真實呼叫與 log，而不是只展示 logo。
+
+Foundry client 使用 `/openai/v1` 的 Responses API，單次 timeout 8 秒且關閉 SDK 自動重試，避免展示時卡住或重複成本。模型輸出必須通過 120 字、三段式與非醫療用語驗證；不符合即改用安全 fallback。外部 Azure 資源與一次真實成功 log 仍待建立，不得將本機 fallback 視為 Azure PoC。
 
 ## AI 輸入／輸出契約
 

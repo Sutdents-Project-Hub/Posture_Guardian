@@ -39,7 +39,7 @@ export function buildPostureTrend(sessions: SessionSummary[]): PostureTrend {
 
   return {
     completed,
-    chartSessions: completed.slice(0, TREND_SAMPLE_SIZE).reverse(),
+    chartSessions: [...qualified].reverse(),
     qualifiedCount: qualified.length,
     readinessPercent: Math.round((qualified.length / TREND_SAMPLE_SIZE) * 100),
     hasComparison: qualified.length === TREND_SAMPLE_SIZE,
@@ -56,18 +56,18 @@ export function buildPostureTrend(sessions: SessionSummary[]): PostureTrend {
 export function nextCoachTask(trend: PostureTrend): { title: string; detail: string } {
   if (!trend.completed.length) {
     return {
-      title: '完成第一個 5 分鐘觀察',
+      title: '完成第一個 10 分鐘觀察',
       detail: '先建立個人中性基線，AI 教練才會用你的資料提出下一步。',
     };
   }
   if (trend.primaryIssue) {
     return {
-      title: `用 5 分鐘觀察「${trend.primaryIssue}」`,
+      title: `用 10 分鐘觀察「${trend.primaryIssue}」`,
       detail: '先調整螢幕或椅背，再重新校準；只改一件事，才能看出差異。',
     };
   }
   return {
-    title: '維持舒服的中性坐姿 5 分鐘',
+    title: '維持舒服的中性坐姿 10 分鐘',
     detail: '不需要僵硬追求滿分，提醒出現時再慢慢回到個人基線。',
   };
 }

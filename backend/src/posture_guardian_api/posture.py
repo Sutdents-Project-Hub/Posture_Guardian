@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import math
 import threading
 from collections.abc import Mapping, Sequence
@@ -13,6 +14,9 @@ import numpy as np
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from posture_guardian_api.schemas import AnalysisResponse, Landmark, ViewMode
+
+MAX_IMAGE_PIXELS = 12_000_000
+logger = logging.getLogger(__name__)
 
 POSE_NAMES = [
     "nose",
@@ -234,9 +238,12 @@ def parse_baseline(raw: str | None) -> dict[str, float] | None:
     if not isinstance(parsed, dict):
         raise PoseInputError("baseline 必須是 JSON 物件。")
     try:
-        return {str(key): float(value) for key, value in parsed.items()}
+        result = {str(key): float(value) for key, value in parsed.items()}
     except (TypeError, ValueError) as exc:
         raise PoseInputError("baseline 的每個值都必須是數字。") from exc
+    if any(not math.isfinite(value) or abs(value) > 180 for value in result.values()):
+        raise PoseInputError("baseline 角度必須是 -180 到 180 的有限數字。")
+    return result
 
 
 class PoseAnalyzer:
@@ -272,16 +279,21 @@ class PoseAnalyzer:
                 )
                 self._landmarker = mp.tasks.vision.PoseLandmarker.create_from_options(options)
             except Exception as exc:  # MediaPipe exposes several native exception types.
-                raise PoseModelUnavailable(f"姿勢模型初始化失敗：{exc}") from exc
+                logger.error("pose_model_initialization_failed error_type=%s", type(exc).__name__)
+                raise PoseModelUnavailable("姿勢模型初始化失敗，請檢查服務健康狀態。") from exc
         return self._landmarker
 
     def detect(self, image_bytes: bytes) -> list[Landmark]:
         """Decode bytes, infer a single pose, and return normalized landmarks."""
         try:
             with Image.open(io.BytesIO(image_bytes)) as source:
+                if source.width * source.height > MAX_IMAGE_PIXELS:
+                    raise PoseInputError("影像像素尺寸過大；請使用 1200 萬像素以下影像。")
                 rgb_image = ImageOps.exif_transpose(source).convert("RGB")
                 pixels = np.asarray(rgb_image)
-        except (UnidentifiedImageError, OSError, ValueError) as exc:
+        except PoseInputError:
+            raise
+        except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
             raise PoseInputError("無法解碼影像，請上傳 JPEG、PNG 或 WebP。") from exc
 
         try:
@@ -294,7 +306,8 @@ class PoseAnalyzer:
         except PoseModelUnavailable:
             raise
         except Exception as exc:
-            raise PoseInputError(f"姿勢推論失敗：{exc}") from exc
+            logger.warning("pose_inference_failed error_type=%s", type(exc).__name__)
+            raise PoseInputError("姿勢推論暫時失敗，請重新取景後再試一次。") from exc
 
         if not result.pose_landmarks:
             return []

@@ -1,6 +1,17 @@
 """Deterministic geometry tests for supported camera viewpoints."""
 
-from posture_guardian_api.posture import calculate_metrics, evaluate_metrics
+import io
+from pathlib import Path
+
+import pytest
+from PIL import Image
+
+from posture_guardian_api.posture import (
+    PoseAnalyzer,
+    PoseInputError,
+    calculate_metrics,
+    evaluate_metrics,
+)
 from posture_guardian_api.schemas import Landmark, ViewMode
 
 
@@ -74,3 +85,13 @@ def test_low_visibility_frame_is_invalid_not_bad() -> None:
     assert result.valid is False
     assert result.status == "invalid"
     assert result.reasons == []
+
+
+def test_oversized_pixel_dimensions_are_rejected_before_inference() -> None:
+    image = Image.new("RGB", (4001, 3000))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    analyzer = PoseAnalyzer(Path("missing-model.task"))
+
+    with pytest.raises(PoseInputError, match="1200 萬像素"):
+        analyzer.detect(buffer.getvalue())
