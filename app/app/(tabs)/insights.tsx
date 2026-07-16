@@ -42,8 +42,8 @@ const PIPELINE = [
   },
   {
     icon: 'auto-awesome' as const,
-    title: 'Foundry 個人化教練',
-    detail: '雲端可用時產生可執行建議；失敗時透明切回本地 fallback。',
+    title: '量界智算個人化教練',
+    detail: '只讀取去識別摘要產生可執行建議；失敗時透明切回本地 fallback。',
   },
 ];
 
@@ -78,12 +78,15 @@ export default function InsightsScreen() {
   const task = nextCoachTask(trend);
   const latest = trend.completed[0];
   const actualProvider = latest?.insight_provider;
-  const providerLabel = actualProvider === 'foundry'
-    ? '最近一次 Foundry 成功'
+  const providerSucceeded = actualProvider === 'liangjie' || actualProvider === 'foundry';
+  const providerLabel = actualProvider === 'liangjie'
+    ? '最近一次量界智算成功'
+    : actualProvider === 'foundry'
+      ? '最近一次使用舊版雲端 AI'
     : actualProvider
       ? '最近一次使用規則式 fallback'
-      : health?.insight_provider === 'foundry'
-        ? 'Foundry 已設定，等待首次呼叫'
+      : health?.insight_provider === 'liangjie' && health.insight_configured
+        ? '量界智算已設定，等待首次呼叫'
         : '目前為規則式 fallback';
   const delta = trend.improvement;
 
@@ -93,7 +96,7 @@ export default function InsightsScreen() {
       title="AI 洞察"
       refreshing={refreshing}
       onRefresh={load}
-      right={<StatusPill label={providerLabel} tone={actualProvider === 'foundry' ? 'success' : 'info'} />}>
+      right={<StatusPill label={providerLabel} tone={providerSucceeded ? 'success' : 'info'} />}>
       <LinearGradient
         colors={gradients.ai}
         start={{ x: 0, y: 0 }}
@@ -136,7 +139,8 @@ export default function InsightsScreen() {
             <Text style={styles.providerText}>{providerLabel}</Text>
           </View>
           <View style={styles.auditGrid}>
-            <AuditFact label="模型部署" value={health?.insight_model || '尚未設定'} />
+            <AuditFact label="模型 ID" value={health?.insight_model || '尚未設定'} />
+            <AuditFact label="API 模式" value={health?.insight_api_mode || '本地 fallback'} />
             <AuditFact label="Prompt 契約" value={health?.insight_prompt_version || 'posture-coach-v1'} />
             <AuditFact label="輸入邊界" value="去識別摘要" />
           </View>
@@ -184,7 +188,7 @@ export default function InsightsScreen() {
       </Surface>
 
       <View style={styles.sectionHeading}>
-        <Text style={styles.kicker}>AZURE CONCEPT PROOF</Text>
+        <Text style={styles.kicker}>VPS DEPLOYMENT-READY PIPELINE</Text>
         <Text accessibilityRole="header" style={styles.sectionTitle}>AI 證據鏈</Text>
         <Text style={styles.sectionLead}>評審可以從輸入到輸出逐步核對，不把 AI 當成黑盒子。</Text>
       </View>

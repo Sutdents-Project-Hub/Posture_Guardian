@@ -12,7 +12,8 @@
 - 使用匿名本機 profile，沒有姓名、學校、Email 或密碼登入。
 - 相機影格以 multipart 暫存送到 API，限制 image MIME、5 MB 與 1,200 萬像素；推論完成即釋放。
 - 資料庫只保存衍生角度、事件與摘要；設定頁可刪除該 profile 的伺服器資料。
-- Foundry provider 只接收工作階段彙總；沒有 server-side 憑證時不做外部 AI 呼叫。
+- 量界智算只接收至少 10 分鐘工作階段的去識別彙總；API key 只存在 backend／Coolify runtime secret，設定不足時服務拒絕冒充已啟用。
+- 量界智算的資料區域、保存、訓練與未成年條款尚未由正式文件確認；確認前不傳原始影像、自由文字或直接識別資訊。
 - `.env.example` 只有安全預設與變數名稱；真實 secret 不得提交。
 
 ## 主要風險與控制
@@ -24,6 +25,7 @@
 | 未成年資料被過度蒐集 | 匿名模式優先；需要帳號或聯絡人時再取得明確同意 |
 | 聯絡人變成監控 | 預設關閉，只傳摘要，不傳即時影像；可查看收件人與撤回 |
 | AI 產生錯誤健康建議 | 輸入限制為摘要、輸出套用安全模板、標示來源、禁止診斷語句 |
+| AI 額度被濫用 | 短工作階段不呼叫外部 AI、SDK 零重試；公網部署仍需 endpoint-aware rate limit 與 access control |
 | 越權讀取他人紀錄 | 目前匿名 API 只適用受控決賽 demo；若公開給多位使用者，必須先加入身份、每筆資源授權與 rate limit |
 | Demo 洩漏真實資料 | 使用去識別測試帳號與同意素材；畫面、log、簡報與 repository 都檢查 |
 
@@ -31,7 +33,7 @@
 
 - 權限前先說明用途與是否離開裝置／瀏覽器。
 - 畫面只取完成姿態推論所需解析度與頻率。
-- API 已限制 image MIME、5 MB 與 1,200 萬像素，client 請求有 8 秒 timeout；production reverse proxy 仍需補 request timeout、body limit 與 rate limit。
+- API 已限制 image MIME、5 MB 與 1,200 萬像素，client 請求有 8 秒 timeout；production reverse proxy 仍需設定 request timeout、body limit 與依 endpoint 區分的 rate limit。
 - 原始影格不可傳送給生成式 AI provider。
 - debug 模式也不得把 base64 或可還原影像的資料寫入 log；API 回傳 landmarks 供即時 overlay，但資料庫不保存 landmarks 全量。
 

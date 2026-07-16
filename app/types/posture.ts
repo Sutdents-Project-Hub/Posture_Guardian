@@ -1,6 +1,7 @@
 export type ViewMode = 'side' | 'front';
 export type InterventionStage = 'starter' | 'advanced' | 'intensive';
 export type AnalysisStatus = 'calibrating' | 'good' | 'attention' | 'invalid';
+export type InsightProvider = 'liangjie' | 'fallback' | 'foundry';
 
 export type Landmark = {
   index: number;
@@ -30,7 +31,9 @@ export type HealthResponse = {
   status: 'ok' | 'degraded';
   database: 'ok' | 'error';
   pose_model: 'ready' | 'missing';
-  insight_provider: 'foundry' | 'fallback';
+  insight_provider: 'liangjie' | 'fallback';
+  insight_configured: boolean;
+  insight_api_mode: 'chat_completions' | 'responses' | null;
   insight_model: string | null;
   insight_prompt_version: string;
 };
@@ -49,7 +52,7 @@ export type SessionSummary = {
   good_posture_rate: number;
   primary_issue: string | null;
   insight_text: string | null;
-  insight_provider: string;
+  insight_provider: InsightProvider;
 };
 
 export type SessionCompleteResponse = {

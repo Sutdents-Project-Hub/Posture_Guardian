@@ -72,7 +72,7 @@ export default function HomeScreen() {
       onRefresh={load}
       right={
         <StatusPill
-          label={health?.status === 'ok' ? 'AI 偵測就緒' : '尚未連線'}
+          label={health?.status === 'ok' ? '姿勢服務就緒' : '尚未連線'}
           tone={health?.status === 'ok' ? 'success' : 'neutral'}
         />
       }>
@@ -165,7 +165,7 @@ export default function HomeScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="開啟 AI 洞察"
-        accessibilityHint="查看六次趨勢、個人化任務與 Azure AI 證據鏈"
+        accessibilityHint="查看六次趨勢、個人化任務與雲端 AI 證據鏈"
         onPress={() => router.push('/(tabs)/insights')}
         style={({ pressed }) => pressed && styles.pressed}>
       <Surface tone="ai" style={[styles.coach, isWide && styles.coachWide]}>
@@ -174,7 +174,11 @@ export default function HomeScreen() {
         </View>
         <View style={styles.coachCopy}>
           <Text style={styles.coachEyebrow}>
-            {latest?.insight_provider === 'foundry' ? 'MICROSOFT FOUNDRY 教練' : '規則式姿勢教練'}
+            {latest?.insight_provider === 'liangjie'
+              ? '量界智算姿勢教練'
+              : latest?.insight_provider === 'foundry'
+                ? '舊版雲端 AI 教練'
+                : '規則式姿勢教練'}
           </Text>
           <Text style={styles.coachTitle}>{coachTask.title}</Text>
           <Text style={styles.coachText}>

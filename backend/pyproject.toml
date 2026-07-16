@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Posture Guardian 的姿勢分析、工作階段與個人化建議 API"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "alembic>=1.15,<2",
   "aiosqlite>=0.22,<1",
   "asyncpg>=0.31,<1",
   "fastapi[standard]>=0.115,<1",

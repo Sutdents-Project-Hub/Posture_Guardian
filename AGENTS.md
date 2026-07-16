@@ -23,7 +23,7 @@
 - 依改善程度調整的初期、進階與加強介入階段
 - 坐姿工作階段、改善趨勢與情緒體驗回饋
 - PostgreSQL 衍生指標儲存與隱私控制
-- Microsoft Foundry 模型產生個人化建議與競賽 Azure 概念驗證
+- 量界智算模型產生去識別個人化建議，失敗時規則式降級
 - 可重現的決賽展示流程、限制說明與答辯證據
 
 ### 專案限制
@@ -46,7 +46,7 @@
 - 專案結構採公司慣例的固定 component roots：`app/` 與 `backend/`；兩者本身就是 framework root，manifest 直接位於各 component，不得增加 project-name 或 framework-name wrapper。
 - Expo SDK 54、pnpm、Python 3.12 與 FastAPI 是已實作且符合競賽展示需求的技術選型；除非另行核准遷移，不為了套用公司新專案基線而更換。
 
-- 目前已有可操作的 MVP：Expo 相機／展示模式、10 秒校準、MediaPipe 姿態分析、持續時間事件、提醒、工作階段、SQLite／PostgreSQL 相容儲存、Foundry provider 與 fallback。尚未建立 Coolify、PostgreSQL 或 Azure 外部資源，不得把容器設定描述成已部署服務。
+- 目前已有可操作的 MVP：Expo 相機／展示模式、10 秒校準、MediaPipe 姿態分析、持續時間事件、提醒、工作階段、SQLite／PostgreSQL 相容儲存、量界智算 OpenAI-compatible adapter 與 fallback。尚未建立 Coolify、PostgreSQL 或量界智算外部資源，不得把容器設定描述成已部署服務。
 - 姿勢定義、起始門檻、時間窗、介入階段與驗證方式以 `docs/posture-evaluation.md` 為準；修改規則時同步文件與測試。
 - `app/app/` 是 Expo Router 入口；`backend/src/posture_guardian_api/main.py` 是 FastAPI 入口。
 

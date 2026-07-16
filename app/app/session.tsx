@@ -791,8 +791,10 @@ function SummaryView({
           </View>
           <View style={styles.summaryInsightCopy}>
             <Text style={styles.summaryInsightEyebrow}>
-              {summary.insight_provider === 'foundry'
-                ? 'MICROSOFT FOUNDRY 建議'
+              {summary.insight_provider === 'liangjie'
+                ? '量界智算建議'
+                : summary.insight_provider === 'foundry'
+                  ? '舊版雲端 AI 建議'
                 : summary.id.startsWith('local-')
                   ? '規則式離線建議'
                   : '規則式備援建議'}

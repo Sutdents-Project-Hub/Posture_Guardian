@@ -1,6 +1,6 @@
 # 姿勢守衛隊 Posture Guardian
 
-> 決賽 MVP 已完成可操作垂直切片｜真人相機與離線展示模式皆可執行｜外部 Coolify／Azure 資源尚未建立
+> 決賽 MVP 已完成可操作垂直切片｜部署架構已轉為 VPS／Coolify／PostgreSQL／量界智算｜外部資源尚未建立
 
 ## 專案簡介
 
@@ -25,7 +25,7 @@
 2. MediaPipe Pose Landmarker 擷取人體姿態節點；規則引擎計算可解釋角度與偏移。
 3. 偏移持續超過時間窗才提醒，避免每次小動作都打斷使用者。
 4. PostgreSQL 只保存衍生指標、工作階段與提醒事件，預設不保存原始影像。
-5. Microsoft Foundry 模型讀取同一匿名使用者最近六次的去識別摘要，產生「趨勢、下一步、下次目標」；模型不可用時使用明確標示的規則式 fallback。
+5. 量界智算讀取同一匿名使用者最近六次的去識別摘要，產生「趨勢、下一步、下次目標」；資料不足或模型不可用時使用明確標示的規則式 fallback。
 
 姿勢標準、初期／進階／加強介入條件與驗證方式以 [姿勢判定規格](docs/posture-evaluation.md) 為準。
 
@@ -36,9 +36,9 @@
 | Expo Android／iOS／Web | AI 首頁、相機設定、校準、即時偵測、摘要、合格工作階段趨勢、AI 稽核資訊，以及方角編輯式的跟隨系統／淺色／深色外觀已實作 |
 | FastAPI | MediaPipe 分析、嚴格輸入驗證、工作階段、長期 AI 摘要、提醒感受、歷史、刪除與存活／就緒檢查已實作 |
 | 姿態事件與提醒 | 10 秒校準、5 秒滾動中位數、8 秒有效偏移累積、3 秒有效回正與分級 cooldown 已實作 |
-| 資料庫 | SQLAlchemy schema 已實作；本機預設 SQLite，production 可切 PostgreSQL |
-| Microsoft Foundry | Responses API provider 已實作；沒有憑證時使用規則式 fallback |
-| Coolify／Microsoft Foundry 資源 | 尚未建立、未部署 |
+| 資料庫 | SQLAlchemy + Alembic baseline 已實作；本機預設 SQLite，Coolify 使用 PostgreSQL |
+| 量界智算 | 可設定的 OpenAI-compatible Chat Completions／Responses adapter 已實作；真實 endpoint／model／key 待帳號文件確認 |
+| Coolify／量界智算資源 | 尚未建立、未部署；目前只完成程式與本機驗證 |
 | 本機 Git | 已有本機版本歷史，未設定 remote；候選版本以 `git status`／`git log` 為準 |
 
 ## 技術與元件
@@ -47,9 +47,9 @@
 |---|---|---|
 | `app` | Android、iOS 與響應式 Web 使用介面 | Expo 54、React Native 0.81.5、TypeScript、Expo Camera |
 | `backend` | MediaPipe、規則引擎、資料與 AI provider | Python 3.12、FastAPI、SQLAlchemy、MediaPipe 0.10.x |
-| PostgreSQL | 工作階段與衍生指標 | async driver 與本機 Compose 啟動已驗證，外部資料庫尚未建立 |
+| PostgreSQL | 工作階段與衍生指標 | async driver、密碼安全 URL 組合與 Alembic migration 已實作 |
 | Coolify | client、API 與 PostgreSQL 的主要部署方向 | Docker images／Compose 本機建置與健康檢查已通過，外部資源尚未建立 |
-| Microsoft Foundry | Azure 概念驗證與個人化建議 | 資源／模型／額度尚待確認 |
+| 量界智算 | 去識別摘要的個人化建議 | adapter 與 fallback 已測試；正式 API 文件、模型、額度與資料政策待確認 |
 
 本專案採固定 component roots：Expo 直接位於 `app/`，FastAPI 直接位於 `backend/`。`package.json`／`pyproject.toml` 直接位於 component 根目錄，不增加 project-name、framework-name 或其他分類包層。
 
@@ -112,12 +112,13 @@ cd ../backend
 ```
 
 Expo Web 靜態輸出位於 `app/dist/`；該資料夾已忽略，不提交 Git。
-`compose.coolify.yaml` 亦已在 Linux ARM64 容器完成 `web`、`api`、`postgres` 建置、啟動與健康檢查；實際 Coolify domain、HTTPS、備份與 Azure 憑證仍需部署時驗收。
+`compose.coolify.yaml` 已在 Linux ARM64 容器重新完成 `web`、`api`、`postgres` 建置、健康檢查、PostgreSQL migration、restart persistence 與本機 backup／restore 演練。實際 Coolify domain、HTTPS、離機備份與量界智算真實呼叫仍必須在部署時驗收。
 
 ## 環境變數與敏感資訊
 
 - 只提交 `.env.example`，真實 `.env`、API key、資料庫密碼與個資不得提交。
 - `EXPO_PUBLIC_*` 會出現在公開 client bundle，不能保存秘密。
+- 量界智算 key 與 PostgreSQL 密碼只放 Coolify runtime secret；Web build 只接收公開 API URL。
 - 原始相機畫面預設只在處理期間短暫存在，不寫入資料庫、log 或 AI prompt。
 
 ## 文件索引

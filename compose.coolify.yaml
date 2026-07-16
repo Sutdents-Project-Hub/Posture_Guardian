@@ -1,38 +1,60 @@
 name: posture_guardian
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *default-logging
     environment:
       POSTGRES_DB: posture_guardian
       POSTGRES_USER: posture_guardian
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
     volumes:
       - posture_guardian_data:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U posture_guardian -d posture_guardian"]
       interval: 10s
       timeout: 5s
       retries: 8
+      start_period: 10s
 
   api:
     build:
       context: ./backend
     restart: unless-stopped
+    init: true
+    logging: *default-logging
     environment:
       APP_ENV: production
-      DATABASE_URL: postgresql://posture_guardian:${POSTGRES_PASSWORD}@postgres:5432/posture_guardian
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: posture_guardian
+      DB_USER: posture_guardian
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
       CORS_ORIGINS: ${WEB_ORIGIN:?Set WEB_ORIGIN to the public HTTPS client origin}
       AI_PROVIDER: ${AI_PROVIDER:-fallback}
-      AZURE_FOUNDRY_ENDPOINT: ${AZURE_FOUNDRY_ENDPOINT:-}
-      AZURE_FOUNDRY_API_KEY: ${AZURE_FOUNDRY_API_KEY:-}
-      AZURE_FOUNDRY_MODEL: ${AZURE_FOUNDRY_MODEL:-gpt-4.1-mini}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_API_MODE: ${AI_API_MODE:-chat_completions}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-8}
     depends_on:
       postgres:
         condition: service_healthy
     expose:
       - "8000"
+    networks:
+      - frontend
+      - backend
 
   web:
     build:
@@ -40,11 +62,20 @@ services:
       args:
         EXPO_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?Set PUBLIC_API_BASE_URL to the public HTTPS API URL}
     restart: unless-stopped
+    init: true
+    logging: *default-logging
     depends_on:
       api:
         condition: service_healthy
     expose:
       - "80"
+    networks:
+      - frontend
 
 volumes:
   posture_guardian_data:
+
+networks:
+  frontend:
+  backend:
+    internal: true

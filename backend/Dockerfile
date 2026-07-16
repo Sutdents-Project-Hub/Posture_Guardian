@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -11,16 +11,22 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
+COPY pyproject.toml requirements.lock ./
+RUN python -m pip install --requirement requirements.lock
+
+COPY alembic.ini ./
+COPY migrations ./migrations
 COPY src ./src
 COPY scripts ./scripts
 
-RUN python -m pip install . \
+RUN python -m pip install --no-deps . \
+    && python -m pip check \
     && python scripts/download_pose_model.py \
     && useradd --create-home --uid 10001 posture \
     && chown -R posture:posture /app
 
-ENV POSE_MODEL_PATH=/app/models/pose_landmarker_lite.task
+ENV POSE_MODEL_PATH=/app/models/pose_landmarker_lite.task \
+    MIGRATION_ROOT=/app
 
 USER posture
 

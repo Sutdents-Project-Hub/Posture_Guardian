@@ -7,14 +7,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from posture_guardian_api.config import get_settings
-from posture_guardian_api.database import create_tables
+from posture_guardian_api.database import migrate_database
 from posture_guardian_api.router import router
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Initialize prototype persistence before serving requests."""
-    await create_tables()
+    """Apply versioned database migrations before serving requests."""
+    await migrate_database()
     yield
 
 

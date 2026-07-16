@@ -26,6 +26,9 @@ def test_session_lifecycle_stores_only_derived_values() -> None:
         health = client.get("/health")
         assert health.status_code == 200
         assert health.json()["database"] == "ok"
+        assert health.json()["insight_provider"] == "fallback"
+        assert health.json()["insight_configured"] is False
+        assert health.json()["insight_api_mode"] is None
         assert health.json()["insight_model"] is None
         assert health.json()["insight_prompt_version"] == "posture-coach-v1"
 

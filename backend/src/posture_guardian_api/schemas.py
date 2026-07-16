@@ -171,6 +171,8 @@ class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
     database: Literal["ok", "error"]
     pose_model: Literal["ready", "missing"]
-    insight_provider: Literal["foundry", "fallback"]
+    insight_provider: Literal["liangjie", "fallback"]
+    insight_configured: bool
+    insight_api_mode: Literal["chat_completions", "responses"] | None
     insight_model: str | None
     insight_prompt_version: str

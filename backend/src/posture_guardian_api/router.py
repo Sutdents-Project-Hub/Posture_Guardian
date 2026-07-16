@@ -76,8 +76,10 @@ async def health(response: Response, db: DatabaseDep) -> HealthResponse:
         status=overall,
         database=database_status,
         pose_model=model_status,
-        insight_provider="foundry" if settings.foundry_configured else "fallback",
-        insight_model=settings.azure_foundry_model if settings.foundry_configured else None,
+        insight_provider=settings.ai_provider,
+        insight_configured=settings.insight_configured,
+        insight_api_mode=settings.ai_api_mode if settings.insight_configured else None,
+        insight_model=settings.ai_model if settings.insight_configured else None,
         insight_prompt_version=PROMPT_VERSION,
     )
 
