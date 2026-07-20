@@ -33,7 +33,7 @@
 
 - 權限前先說明用途與是否離開裝置／瀏覽器。
 - 畫面只取完成姿態推論所需解析度與頻率。
-- API 已限制 image MIME、5 MB 與 1,200 萬像素，client 請求有 8 秒 timeout；production reverse proxy 仍需設定 request timeout、body limit 與依 endpoint 區分的 rate limit。
+- API 已限制 image MIME、5 MB 與 1,200 萬像素，client 請求有 8 秒 timeout；API 正常處理的回應另帶 `Cache-Control: no-store`、`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、關閉 camera／microphone／geolocation 的 `Permissions-Policy`，以及 `X-Robots-Tag: noindex, nofollow`。這些 browser-level defaults 不取代 production reverse proxy 的 request timeout、body limit、依 endpoint 區分的 rate limit 或 access control。
 - 原始影格不可傳送給生成式 AI provider。
 - debug 模式也不得把 base64 或可還原影像的資料寫入 log；API 回傳 landmarks 供即時 overlay，但資料庫不保存 landmarks 全量。
 

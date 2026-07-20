@@ -13,6 +13,8 @@
 
 使用者於 2026-07-16 告知「官方 Azure 已關閉」，因此實作改為：自有 VPS + Coolify + PostgreSQL + 量界智算。這是目前的部署事實來源，不等同於已取得主辦方「可替代 Azure 計分」的公開公告。
 
+決賽現行展示請使用 [VPS／Coolify 現行架構版簡報](../outputs/Posture_Guardian_概念驗證_現行架構版.pptx)。`outputs/Posture_Guardian_概念驗證.pptx` 僅保留作歷史 Azure POC，不可作為目前架構或已完成部署的證據。
+
 官方決賽評分 PDF 仍把「概念驗證（Azure）」列為 25%。量界智算與自有 VPS 能證明完整雲端產品與 AI 整合，但不能自行宣稱等同取得 Azure 25%。決賽前最高優先事項是保存官方關閉通知，並向主辦方取得下列書面確認：
 
 1. Azure 關閉後，25% 項目的替代評分標準。
@@ -53,10 +55,11 @@
 3. 顯示耳、肩、髖節點、目前角度、個人基線與門檻。
 4. 前傾並維持 8 秒，觸發具原因的「頭頸偏移」提醒。
 5. 回正後結束工作階段，顯示良好坐姿率、提醒次數與平均分數。
-6. API 以 Alembic 管理的 PostgreSQL 保存去識別摘要。
-7. 合格資料達 10 分鐘時，量界智算產生「趨勢、下一步、下次目標」；失敗則透明顯示 fallback。
-8. AI 洞察展示六次趨勢、資料充分度、model ID、API mode、prompt version 與實際 provider。
-9. 展示 Coolify 三個 services、健康狀態與去敏成功 log；不可只放供應商 logo。
+6. 場地網路或相機失敗時改用內建展示模式：只顯示本地摘要，不建立後端工作階段或污染正式歷史。
+7. 正式觀察的 API 以 Alembic 管理的 PostgreSQL 保存去識別摘要。
+8. 合格資料達 10 分鐘時，量界智算產生「趨勢、下一步、下次目標」；失敗則透明顯示 fallback。
+9. AI 洞察展示六次趨勢、資料充分度、model ID、API mode、prompt version 與實際 provider。
+10. 展示 Coolify 三個 services、健康狀態與去敏成功 log；不可只放供應商 logo。
 
 ## 情緒體驗地圖
 

@@ -104,6 +104,7 @@ curl -i -X OPTIONS https://api.example.com/api/v1/sessions \
 
 - 目前匿名 profile API 適合受控決賽 demo，不是完整多使用者身份系統。
 - 對公網開放前，必須先在 Coolify／反向代理加入 endpoint-aware rate limit、request timeout、body limit 與 demo access control；未完成時只可在受控網路展示，不可直接公開。姿態影格流量和 AI 完成呼叫不可使用同一個過低限制。
+- API 正常處理的回應已固定加入 `Cache-Control: no-store`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy` 與 `X-Robots-Tag` 等 browser-level headers；這不會建立登入、存取控制、TLS、WAF 或 rate limit，不能當作公網開放條件已完成。
 - 正式多使用者產品仍需身份驗證、resource ownership、額度與稽核；不能只靠前端匿名 ID。
 - production `/docs`／`openapi.json` 應由反向代理限制，避免把測試介面無條件公開。
 

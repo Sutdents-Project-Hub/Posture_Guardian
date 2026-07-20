@@ -162,6 +162,7 @@ export default function SessionScreen() {
       }
     }
     resetRuntime();
+    if (demo) setCloudStorageAvailable(false);
     calibrationStartedRef.current = Date.now();
     setPhase('calibrating');
   }
@@ -217,17 +218,19 @@ export default function SessionScreen() {
         metricKeys.map((key) => [key, +median(validFrames.map((frame) => frame.metrics[key])).toFixed(2)]),
       );
       setBaseline(nextBaseline);
-      try {
-        const created = await createSession({
-          profile_id: profileId,
-          view_mode: viewMode,
-          intervention_stage: interventionStage,
-          baseline: nextBaseline,
-        });
-        sessionIdRef.current = created.id;
-        sessionStartedIsoRef.current = created.started_at;
-      } catch {
-        setCloudStorageAvailable(false);
+      if (!demo) {
+        try {
+          const created = await createSession({
+            profile_id: profileId,
+            view_mode: viewMode,
+            intervention_stage: interventionStage,
+            baseline: nextBaseline,
+          });
+          sessionIdRef.current = created.id;
+          sessionStartedIsoRef.current = created.started_at;
+        } catch {
+          setCloudStorageAvailable(false);
+        }
       }
       const now = Date.now();
       activeStartedRef.current = now;
@@ -329,7 +332,7 @@ export default function SessionScreen() {
         }
 
         const sessionId = sessionIdRef.current;
-        if (sessionId && cloudStorageAvailable) {
+        if (!demo && sessionId && cloudStorageAvailable) {
           try {
             await addSessionSample(sessionId, {
               duration_seconds: sampleDuration,
@@ -407,7 +410,7 @@ export default function SessionScreen() {
     setPhase('finishing');
     let result: SessionCompleteResponse;
     const sessionId = sessionIdRef.current;
-    if (sessionId && cloudStorageAvailable) {
+    if (!demo && sessionId && cloudStorageAvailable) {
       try {
         result = await completeSession(sessionId);
       } catch {

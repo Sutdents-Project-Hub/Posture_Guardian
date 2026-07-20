@@ -1,9 +1,9 @@
 """FastAPI application entrypoint for Posture Guardian."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from posture_guardian_api.config import get_settings
@@ -20,6 +20,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 settings = get_settings()
 
+_SECURITY_RESPONSE_HEADERS = {
+    "Cache-Control": "no-store",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-Robots-Tag": "noindex, nofollow",
+}
+
 app = FastAPI(
     title="Posture Guardian API",
     version="0.1.0",
@@ -33,6 +42,20 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_security_response_headers(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Apply browser-safe defaults without replacing proxy-level access controls."""
+    response = await call_next(request)
+    for name, value in _SECURITY_RESPONSE_HEADERS.items():
+        response.headers[name] = value
+    return response
+
+
 app.include_router(router)
 
 

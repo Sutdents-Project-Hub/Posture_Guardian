@@ -20,6 +20,26 @@ def test_openapi_metadata() -> None:
     assert schema["info"]["version"] == "0.1.0"
 
 
+def test_api_sets_security_headers_and_preserves_cors_preflight() -> None:
+    with TestClient(app) as client:
+        response = client.options(
+            "/api/v1/sessions",
+            headers={
+                "Origin": "http://localhost:8081",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:8081"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["x-robots-tag"] == "noindex, nofollow"
+
+
 def test_session_lifecycle_stores_only_derived_values() -> None:
     profile_id = f"test-{uuid4()}"
     with TestClient(app) as client:
