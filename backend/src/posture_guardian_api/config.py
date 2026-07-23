@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     ai_model: str = ""
     ai_api_mode: Literal["chat_completions", "responses"] = "chat_completions"
     ai_timeout_seconds: float = Field(default=8.0, ge=1, le=30)
+    auth_session_days: int = Field(default=14, ge=1, le=30)
 
     @model_validator(mode="after")
     def validate_external_services(self) -> "Settings":

@@ -11,8 +11,16 @@ import {
   type ThemePalette,
 } from '@/constants/design';
 import type { InterventionStage } from '@/types/posture';
+import {
+  type AuthUser,
+  getCurrentAccount,
+  loginAccount,
+  logoutAccount,
+  registerAccount,
+  setAccessToken,
+} from '@/lib/api';
+import { clearAuthToken, readAuthToken, saveAuthToken } from '@/lib/auth-storage';
 
-const PROFILE_KEY = 'posture-guardian/profile-id';
 const STAGE_KEY = 'posture-guardian/intervention-stage';
 const HAPTICS_KEY = 'posture-guardian/haptics';
 const THEME_KEY = 'posture-guardian/theme';
@@ -22,7 +30,7 @@ export type ResolvedTheme = Exclude<ThemePreference, 'system'>;
 
 type AppContextValue = {
   ready: boolean;
-  profileId: string;
+  account: AuthUser | null;
   interventionStage: InterventionStage;
   hapticsEnabled: boolean;
   themePreference: ThemePreference;
@@ -32,14 +40,12 @@ type AppContextValue = {
   setInterventionStage: (value: InterventionStage) => Promise<void>;
   setHapticsEnabled: (value: boolean) => Promise<void>;
   setThemePreference: (value: ThemePreference) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
-
-function createProfileId(): string {
-  const random = Math.random().toString(36).slice(2, 12);
-  return `local-${Date.now().toString(36)}-${random}`;
-}
 
 function isStage(value: string | null): value is InterventionStage {
   return value === 'starter' || value === 'advanced' || value === 'intensive';
@@ -52,7 +58,7 @@ function isThemePreference(value: string | null): value is ThemePreference {
 export function AppProvider({ children }: PropsWithChildren) {
   const systemTheme = useColorScheme();
   const [ready, setReady] = useState(false);
-  const [profileId, setProfileId] = useState('local-loading');
+  const [account, setAccount] = useState<AuthUser | null>(null);
   const [interventionStage, setStageState] = useState<InterventionStage>('starter');
   const [hapticsEnabled, setHapticsState] = useState(true);
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>('system');
@@ -60,16 +66,23 @@ export function AppProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let active = true;
     async function load() {
-      const [[, storedProfile], [, storedStage], [, storedHaptics], [, storedTheme]] = await AsyncStorage.multiGet([
-        PROFILE_KEY,
+      const [[, storedStage], [, storedHaptics], [, storedTheme]] = await AsyncStorage.multiGet([
         STAGE_KEY,
         HAPTICS_KEY,
         THEME_KEY,
       ]);
-      const nextProfile = storedProfile || createProfileId();
-      if (!storedProfile) await AsyncStorage.setItem(PROFILE_KEY, nextProfile);
+      const storedToken = await readAuthToken();
+      if (storedToken) {
+        setAccessToken(storedToken);
+        try {
+          const currentAccount = await getCurrentAccount();
+          if (active) setAccount(currentAccount);
+        } catch {
+          setAccessToken(null);
+          await clearAuthToken();
+        }
+      }
       if (!active) return;
-      setProfileId(nextProfile);
       if (isStage(storedStage)) setStageState(storedStage);
       if (storedHaptics !== null) setHapticsState(storedHaptics !== 'false');
       if (isThemePreference(storedTheme)) setThemePreferenceState(storedTheme);
@@ -89,7 +102,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const value = useMemo<AppContextValue>(
     () => ({
       ready,
-      profileId,
+      account,
       interventionStage,
       hapticsEnabled,
       themePreference,
@@ -108,8 +121,29 @@ export function AppProvider({ children }: PropsWithChildren) {
         setThemePreferenceState(next);
         await AsyncStorage.setItem(THEME_KEY, next);
       },
+      signIn: async (email, password) => {
+        const result = await loginAccount(email, password);
+        setAccessToken(result.access_token);
+        await saveAuthToken(result.access_token);
+        setAccount(result.user);
+      },
+      signUp: async (email, password) => {
+        const result = await registerAccount(email, password);
+        setAccessToken(result.access_token);
+        await saveAuthToken(result.access_token);
+        setAccount(result.user);
+      },
+      signOut: async () => {
+        try {
+          await logoutAccount();
+        } finally {
+          setAccessToken(null);
+          await clearAuthToken();
+          setAccount(null);
+        }
+      },
     }),
-    [gradients, hapticsEnabled, interventionStage, palette, profileId, ready, resolvedTheme, themePreference],
+    [account, gradients, hapticsEnabled, interventionStage, palette, ready, resolvedTheme, themePreference],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

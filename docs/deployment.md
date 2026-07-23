@@ -37,6 +37,7 @@
 | `POSTGRES_PASSWORD` | runtime secret | 使用密碼管理器產生；程式會安全 URL encode 特殊字元 |
 | `WEB_ORIGIN` | runtime public config | `https://app.example.com`，不可有 path 或尾斜線 |
 | `PUBLIC_API_BASE_URL` | Web build variable | `https://api.example.com`，不可有尾斜線 |
+| `AUTH_SESSION_DAYS` | API runtime config | 1–30，預設 `14`；變更後需重啟 API |
 
 量界智算尚未填妥前：
 
@@ -44,6 +45,7 @@
 AI_PROVIDER=fallback
 AI_API_MODE=chat_completions
 AI_TIMEOUT_SECONDS=8
+AUTH_SESSION_DAYS=14
 ```
 
 取得量界智算正式帳號文件後：
@@ -67,7 +69,7 @@ AI_TIMEOUT_SECONDS=8
 
 - Compose 以 `DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USER`、`DB_PASSWORD` 傳給 API，再由 SQLAlchemy 安全建立連線 URL。
 - API 啟動時執行 `alembic upgrade head`；migration 失敗時不開始服務。
-- 部署後可在 API container 檢查：`alembic current`，預期為 `20260716_01 (head)`。
+- 部署後可在 API container 檢查：`alembic current`，預期為 `20260722_01 (head)`。
 - Named volume 只提供持久化，不等於備份；Coolify 可能替實際 volume 名稱加入 resource UUID，不可用猜測的 volume 名操作 production。
 - 更改 `POSTGRES_PASSWORD` 環境變數不會自動旋轉既有 PostgreSQL role 密碼。輪替時先在資料庫執行 `ALTER ROLE`，再更新 Coolify secret，並立即驗證 API readiness。
 
@@ -102,10 +104,9 @@ curl -i -X OPTIONS https://api.example.com/api/v1/sessions \
 
 ## 公開服務安全邊界
 
-- 目前匿名 profile API 適合受控決賽 demo，不是完整多使用者身份系統。
-- 對公網開放前，必須先在 Coolify／反向代理加入 endpoint-aware rate limit、request timeout、body limit 與 demo access control；未完成時只可在受控網路展示，不可直接公開。姿態影格流量和 AI 完成呼叫不可使用同一個過低限制。
-- API 正常處理的回應已固定加入 `Cache-Control: no-store`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy` 與 `X-Robots-Tag` 等 browser-level headers；這不會建立登入、存取控制、TLS、WAF 或 rate limit，不能當作公網開放條件已完成。
-- 正式多使用者產品仍需身份驗證、resource ownership、額度與稽核；不能只靠前端匿名 ID。
+- API 已提供 Argon2 密碼雜湊、可撤銷 bearer session 與 resource ownership；API response 設定 `no-store`，Web Nginx 為入口文件設定無快取、為靜態資產設定快取與 Content Security Policy。Web token 只在當前 browser tab 保存，原生 token 只在 SecureStore 保存。
+- 對公網開放前，仍必須先在 Coolify／反向代理加入登入端點與影像端點各自的 rate limit、request timeout、body limit、TLS、監控與稽核；未完成時只可在受控網路展示。姿態影格流量和 AI 完成呼叫不可使用同一個過低限制。
+- Email 驗證、忘記密碼、帳號永久刪除與未成年同意尚未實作；不能把目前帳號流程當作完整公開未成年帳號服務。
 - production `/docs`／`openapi.json` 應由反向代理限制，避免把測試介面無條件公開。
 
 ## 發布與回滾

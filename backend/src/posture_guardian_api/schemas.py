@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class ViewMode(StrEnum):
@@ -57,10 +57,32 @@ class StrictInputModel(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
 
 
+class AuthCredentials(StrictInputModel):
+    """Email and password accepted for account registration and login."""
+
+    email: EmailStr
+    password: Annotated[str, Field(min_length=12, max_length=128)]
+
+
+class AuthUser(BaseModel):
+    """The non-sensitive account fields returned to the client."""
+
+    id: str
+    email: EmailStr
+
+
+class AuthSessionResponse(BaseModel):
+    """A newly issued bearer credential and account identity."""
+
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_at: datetime
+    user: AuthUser
+
+
 class SessionCreate(StrictInputModel):
     """Create a calibrated work session."""
 
-    profile_id: Annotated[str, Field(min_length=8, max_length=64)]
     view_mode: ViewMode
     intervention_stage: InterventionStage = InterventionStage.STARTER
     baseline: dict[str, float]

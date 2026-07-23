@@ -51,7 +51,7 @@ export default function InsightsScreen() {
   const { gradients, palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const isWide = useWideLayout(840);
-  const { profileId, ready } = useAppContext();
+  const { account, ready } = useAppContext();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,12 +61,12 @@ export default function InsightsScreen() {
     setRefreshing(true);
     const [healthResult, sessionResult] = await Promise.allSettled([
       getHealth(),
-      getSessions(profileId),
+      account ? getSessions() : Promise.resolve([]),
     ]);
     setHealth(healthResult.status === 'fulfilled' ? healthResult.value : null);
     setSessions(sessionResult.status === 'fulfilled' ? sessionResult.value : []);
     setRefreshing(false);
-  }, [profileId, ready]);
+  }, [account, ready]);
 
   useFocusEffect(
     useCallback(() => {
@@ -109,7 +109,7 @@ export default function InsightsScreen() {
           </View>
           <Text style={styles.heroTitle}>每個提醒，都能說明依據。</Text>
           <Text style={styles.heroLead}>
-            骨架與規則負責即時判斷；AI 讀取同一匿名使用者的趨勢摘要，只產生下一個可執行調整。
+            骨架與規則負責即時判斷；AI 只讀取同一帳號的去識別趨勢摘要，產生下一個可執行調整。
           </Text>
           <View style={styles.heroFacts}>
             <Fact value="33" label="姿態節點" />

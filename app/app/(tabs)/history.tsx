@@ -18,7 +18,7 @@ import type { SessionSummary } from '@/types/posture';
 export default function HistoryScreen() {
   const { palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
-  const { profileId, ready } = useAppContext();
+  const { account, ready } = useAppContext();
   const [items, setItems] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,7 +30,7 @@ export default function HistoryScreen() {
       if (refresh) setRefreshing(true);
       else setLoading(true);
       try {
-        setItems(await getSessions(profileId));
+        setItems(account ? await getSessions() : []);
         setOffline(false);
       } catch {
         setOffline(true);
@@ -39,7 +39,7 @@ export default function HistoryScreen() {
         setRefreshing(false);
       }
     },
-    [profileId, ready],
+    [account, ready],
   );
 
   useFocusEffect(

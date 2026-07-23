@@ -4,7 +4,7 @@
 
 `backend` 承接 MediaPipe 姿態節點、可解釋規則、工作階段資料、PostgreSQL 與 AI provider。client 不得直接連資料庫或保存 provider secret。
 
-已實作影像型態／5 MB／1,200 萬像素限制、33 節點推論、視角與有限數值輸入驗證、匿名工作階段、衍生 sample、六次趨勢 AI 輸入、不含自由文字的提醒感受、歷史、刪除、量界智算 OpenAI-compatible adapter 與 fallback。影格只存在請求記憶體，不會寫入資料表。
+已實作 Argon2 密碼雜湊、可撤銷 opaque bearer session、每筆工作階段的帳號 ownership、影像型態／5 MB／1,200 萬像素限制、33 節點推論、視角與有限數值輸入驗證、衍生 sample、六次趨勢 AI 輸入、不含自由文字的提醒感受、歷史、刪除、量界智算 OpenAI-compatible adapter 與 fallback。影格只存在請求記憶體，不會寫入資料表。
 
 ## 已驗證環境
 
@@ -52,8 +52,9 @@ python3.12 -m venv .venv
 - `AI_PROVIDER`
 - `AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL`
 - `AI_API_MODE`、`AI_TIMEOUT_SECONDS`
+- `AUTH_SESSION_DAYS`（1–30，預設 14）
 
-本機預設使用 `backend/posture_guardian.db`；Coolify 以分離的 `DB_*` 欄位連 PostgreSQL，特殊密碼字元會由 SQLAlchemy 安全編碼。啟動時自動執行 Alembic migration。`AI_PROVIDER=liangjie` 必須同時具備完整 base URL、key 與 model；預設 Chat Completions，也可依正式文件切 Responses。外部呼叫預設 8 秒、SDK 零重試，少於 10 分鐘有效資料不呼叫付費 AI；輸出不符合三段式、字數或非醫療契約時改用 fallback。
+本機預設使用 `backend/posture_guardian.db`；Coolify 以分離的 `DB_*` 欄位連 PostgreSQL，特殊密碼字元會由 SQLAlchemy 安全編碼。啟動時自動執行 Alembic migration。註冊只儲存 Email 與 Argon2 hash，server 只保存 SHA-256 digest 的隨機 bearer token；未登入、過期 token 或他人 session ID 都不能讀寫工作階段。`AI_PROVIDER=liangjie` 必須同時具備完整 base URL、key 與 model；預設 Chat Completions，也可依正式文件切 Responses。外部呼叫預設 8 秒、SDK 零重試，少於 10 分鐘有效資料不呼叫付費 AI；輸出不符合三段式、字數或非醫療契約時改用 fallback。
 
 ## 部署限制
 

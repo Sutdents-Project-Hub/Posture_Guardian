@@ -134,7 +134,7 @@ async def complete_session(
                 await db.scalars(
                     select(PostureSession)
                     .where(
-                        PostureSession.profile_id == session.profile_id,
+                        PostureSession.user_id == session.user_id,
                         PostureSession.id != session.id,
                         PostureSession.ended_at.is_not(None),
                     )
@@ -179,7 +179,7 @@ async def complete_session(
             await db.scalars(
                 select(PostureSession)
                 .where(
-                    PostureSession.profile_id == session.profile_id,
+                    PostureSession.user_id == session.user_id,
                     PostureSession.ended_at.is_not(None),
                 )
                 .order_by(PostureSession.started_at.desc())
@@ -197,13 +197,13 @@ async def complete_session(
     )
 
 
-async def delete_profile_data(db: AsyncSession, profile_id: str) -> int:
-    """Delete all sessions and cascading samples for an anonymous profile."""
-    statement = select(PostureSession.id).where(PostureSession.profile_id == profile_id)
+async def delete_user_data(db: AsyncSession, user_id: str) -> int:
+    """Delete all sessions and cascading samples belonging to one authenticated account."""
+    statement = select(PostureSession.id).where(PostureSession.user_id == user_id)
     ids = list((await db.scalars(statement)).all())
     if ids:
         await db.execute(delete(SessionFeedback).where(SessionFeedback.session_id.in_(ids)))
         await db.execute(delete(PostureSample).where(PostureSample.session_id.in_(ids)))
-    result = await db.execute(delete(PostureSession).where(PostureSession.profile_id == profile_id))
+    result = await db.execute(delete(PostureSession).where(PostureSession.user_id == user_id))
     await db.commit()
     return int(result.rowcount or 0)  # type: ignore[attr-defined]

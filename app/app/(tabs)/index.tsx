@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { type Href, router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -24,7 +24,7 @@ export default function HomeScreen() {
   const { gradients, palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const isWide = useWideLayout(800);
-  const { profileId, interventionStage, ready } = useAppContext();
+  const { account, interventionStage, ready } = useAppContext();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,12 +34,12 @@ export default function HomeScreen() {
     setRefreshing(true);
     const [healthResult, sessionResult] = await Promise.allSettled([
       getHealth(),
-      getSessions(profileId),
+      account ? getSessions() : Promise.resolve([]),
     ]);
     setHealth(healthResult.status === 'fulfilled' ? healthResult.value : null);
     setSessions(sessionResult.status === 'fulfilled' ? sessionResult.value : []);
     setRefreshing(false);
-  }, [profileId, ready]);
+  }, [account, ready]);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,6 +61,10 @@ export default function HomeScreen() {
   const coachTask = nextCoachTask(trend);
 
   function start(mode: ViewMode, demo = false) {
+    if (!demo && !account) {
+      router.push('/auth' as Href);
+      return;
+    }
     router.push({ pathname: '/session', params: { mode, demo: demo ? '1' : '0' } });
   }
 
@@ -98,8 +102,8 @@ export default function HomeScreen() {
           </View>
           <View style={[styles.heroActions, !isWide && styles.heroActionsNarrow]}>
             <AppButton
-              label="開始側面偵測"
-              icon="center-focus-strong"
+              label={account ? '開始側面偵測' : '登入後開始偵測'}
+              icon={account ? 'center-focus-strong' : 'lock-outline'}
               fullWidth={!isWide}
               onPress={() => start('side')}
             />

@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { usePreventRemove } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
-import { router, useLocalSearchParams } from 'expo-router';
+import { type Href, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -80,7 +80,7 @@ export default function SessionScreen() {
   const demo = params.demo === '1';
   const isWide = useWideLayout(900);
   const {
-    profileId,
+    account,
     interventionStage,
     hapticsEnabled,
     setInterventionStage,
@@ -154,6 +154,10 @@ export default function SessionScreen() {
   }
 
   async function startCalibration() {
+    if (!demo && !account) {
+      router.replace('/auth' as Href);
+      return;
+    }
     if (!demo) {
       const result = permission?.granted ? permission : await requestPermission();
       if (!result.granted) {
@@ -221,7 +225,6 @@ export default function SessionScreen() {
       if (!demo) {
         try {
           const created = await createSession({
-            profile_id: profileId,
             view_mode: viewMode,
             intervention_stage: interventionStage,
             baseline: nextBaseline,
@@ -369,7 +372,7 @@ export default function SessionScreen() {
     hapticsEnabled,
     interventionStage,
     phase,
-    profileId,
+    account,
     viewMode,
   ]);
 

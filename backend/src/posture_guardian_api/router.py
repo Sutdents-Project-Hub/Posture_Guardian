@@ -1,5 +1,6 @@
 """HTTP routes for analysis, sessions, history, and privacy controls."""
 
+from datetime import datetime
 from typing import Annotated
 from uuid import uuid4
 
@@ -9,7 +10,6 @@ from fastapi import (
     File,
     Form,
     HTTPException,
-    Query,
     Response,
     UploadFile,
     status,
@@ -18,10 +18,20 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from posture_guardian_api.auth import (
+    AuthenticatedSession,
+    get_authenticated_session,
+    get_current_user,
+    hash_password,
+    issue_session,
+    normalize_email,
+    password_matches,
+    verify_unknown_password,
+)
 from posture_guardian_api.config import get_settings
 from posture_guardian_api.database import get_db
 from posture_guardian_api.insights import PROMPT_VERSION
-from posture_guardian_api.models import PostureSample, PostureSession, SessionFeedback
+from posture_guardian_api.models import PostureSample, PostureSession, SessionFeedback, User
 from posture_guardian_api.posture import (
     REASON_LABELS,
     THRESHOLDS,
@@ -33,6 +43,9 @@ from posture_guardian_api.posture import (
 )
 from posture_guardian_api.schemas import (
     AnalysisResponse,
+    AuthCredentials,
+    AuthSessionResponse,
+    AuthUser,
     DeleteResponse,
     FeedbackAccepted,
     HealthResponse,
@@ -45,13 +58,32 @@ from posture_guardian_api.schemas import (
     SessionList,
     ViewMode,
 )
-from posture_guardian_api.sessions import complete_session, delete_profile_data, to_summary
+from posture_guardian_api.sessions import complete_session, delete_user_data, to_summary
 
 router = APIRouter()
 settings = get_settings()
 pose_analyzer = PoseAnalyzer(settings.pose_model_path)
 
 DatabaseDep = Annotated[AsyncSession, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+CurrentAuth = Annotated[AuthenticatedSession, Depends(get_authenticated_session)]
+
+
+def auth_response(token: str, session_expires_at: datetime, user: User) -> AuthSessionResponse:
+    """Build the only client-visible representation of a successful login."""
+    return AuthSessionResponse(
+        access_token=token,
+        expires_at=session_expires_at,
+        user=AuthUser(id=user.id, email=user.email),
+    )
+
+
+async def owned_session(db: AsyncSession, session_id: str, user: User) -> PostureSession:
+    """Return a session only when it belongs to the authenticated account."""
+    session = await db.get(PostureSession, session_id)
+    if session is None or session.user_id != user.id:
+        raise HTTPException(status_code=404, detail="找不到工作階段。")
+    return session
 
 
 @router.get("/live", tags=["meta"])
@@ -82,6 +114,55 @@ async def health(response: Response, db: DatabaseDep) -> HealthResponse:
         insight_model=settings.ai_model if settings.insight_configured else None,
         insight_prompt_version=PROMPT_VERSION,
     )
+
+
+@router.post(
+    "/api/v1/auth/register",
+    response_model=AuthSessionResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["auth"],
+)
+async def register_account(payload: AuthCredentials, db: DatabaseDep) -> AuthSessionResponse:
+    """Register an account, storing only an Argon2 password hash."""
+    email = normalize_email(str(payload.email))
+    existing = await db.scalar(select(User).where(User.email == email))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="這個 Email 已註冊，請直接登入。")
+    user = User(id=str(uuid4()), email=email, password_hash=hash_password(payload.password))
+    token, session = issue_session(user)
+    db.add_all([user, session])
+    await db.commit()
+    return auth_response(token, session.expires_at, user)
+
+
+@router.post("/api/v1/auth/login", response_model=AuthSessionResponse, tags=["auth"])
+async def login_account(payload: AuthCredentials, db: DatabaseDep) -> AuthSessionResponse:
+    """Authenticate an account and issue a new revocable bearer session."""
+    email = normalize_email(str(payload.email))
+    user = await db.scalar(select(User).where(User.email == email))
+    if user is None:
+        verify_unknown_password(payload.password)
+        raise HTTPException(status_code=401, detail="Email 或密碼不正確。")
+    if not password_matches(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Email 或密碼不正確。")
+    token, session = issue_session(user)
+    db.add(session)
+    await db.commit()
+    return auth_response(token, session.expires_at, user)
+
+
+@router.get("/api/v1/auth/me", response_model=AuthUser, tags=["auth"])
+async def current_account(user: CurrentUser) -> AuthUser:
+    """Return the authenticated account without exposing password or session records."""
+    return AuthUser(id=user.id, email=user.email)
+
+
+@router.post("/api/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
+async def logout_account(current: CurrentAuth, db: DatabaseDep) -> Response:
+    """Revoke the current bearer session immediately."""
+    await db.delete(current.session)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
@@ -139,11 +220,16 @@ async def analyze_posture(
     status_code=status.HTTP_201_CREATED,
     tags=["sessions"],
 )
-async def create_session(payload: SessionCreate, db: DatabaseDep) -> SessionCreated:
+async def create_session(
+    payload: SessionCreate,
+    db: DatabaseDep,
+    user: CurrentUser,
+) -> SessionCreated:
     """Start storage after calibration has produced a valid baseline."""
     session = PostureSession(
         id=str(uuid4()),
-        profile_id=payload.profile_id,
+        profile_id=user.id,
+        user_id=user.id,
         view_mode=payload.view_mode.value,
         intervention_stage=payload.intervention_stage.value,
         baseline=payload.baseline,
@@ -163,11 +249,10 @@ async def add_sample(
     session_id: str,
     payload: SampleCreate,
     db: DatabaseDep,
+    user: CurrentUser,
 ) -> SampleAccepted:
     """Store derived metrics only; no image or landmark arrays enter the database."""
-    session = await db.get(PostureSession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="找不到工作階段。")
+    session = await owned_session(db, session_id, user)
     if session.ended_at is not None:
         raise HTTPException(status_code=409, detail="工作階段已結束。")
     expected_metrics = set(THRESHOLDS[ViewMode(session.view_mode)])
@@ -199,11 +284,13 @@ async def add_sample(
     response_model=SessionCompleteResponse,
     tags=["sessions"],
 )
-async def finish_session(session_id: str, db: DatabaseDep) -> SessionCompleteResponse:
+async def finish_session(
+    session_id: str,
+    db: DatabaseDep,
+    user: CurrentUser,
+) -> SessionCompleteResponse:
     """Finish idempotently and produce summary, insight, and stage suggestion."""
-    session = await db.get(PostureSession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="找不到工作階段。")
+    session = await owned_session(db, session_id, user)
     return await complete_session(db, session, get_settings())
 
 
@@ -216,11 +303,10 @@ async def save_feedback(
     session_id: str,
     payload: SessionFeedbackCreate,
     db: DatabaseDep,
+    user: CurrentUser,
 ) -> FeedbackAccepted:
     """Save optional categorical UX feedback for a completed session."""
-    session = await db.get(PostureSession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="找不到工作階段。")
+    session = await owned_session(db, session_id, user)
     if session.ended_at is None:
         raise HTTPException(status_code=409, detail="工作階段尚未結束。")
     feedback = await db.get(SessionFeedback, session_id)
@@ -236,15 +322,17 @@ async def save_feedback(
 @router.get("/api/v1/sessions", response_model=SessionList, tags=["sessions"])
 async def list_sessions(
     db: DatabaseDep,
-    profile_id: Annotated[str, Query(min_length=8, max_length=64)],
-    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    user: CurrentUser,
+    limit: int = 20,
 ) -> SessionList:
-    """Return the most recent completed and active sessions for a local profile."""
+    """Return the most recent completed and active sessions for the signed-in account."""
+    if not 1 <= limit <= 50:
+        raise HTTPException(status_code=422, detail="limit 必須介於 1 到 50。")
     rows = list(
         (
             await db.scalars(
                 select(PostureSession)
-                .where(PostureSession.profile_id == profile_id)
+                .where(PostureSession.user_id == user.id)
                 .order_by(PostureSession.started_at.desc())
                 .limit(limit)
             )
@@ -254,13 +342,11 @@ async def list_sessions(
 
 
 @router.delete(
-    "/api/v1/profiles/{profile_id}/data",
+    "/api/v1/account/data",
     response_model=DeleteResponse,
     tags=["privacy"],
 )
-async def delete_data(profile_id: str, db: DatabaseDep) -> DeleteResponse:
-    """Let a user remove all of their anonymously keyed session data."""
-    if not 8 <= len(profile_id) <= 64:
-        raise HTTPException(status_code=422, detail="profile_id 格式錯誤。")
-    deleted = await delete_profile_data(db, profile_id)
+async def delete_data(db: DatabaseDep, user: CurrentUser) -> DeleteResponse:
+    """Let a signed-in account remove all of its derived posture records."""
+    deleted = await delete_user_data(db, user.id)
     return DeleteResponse(deleted_sessions=deleted)

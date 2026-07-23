@@ -14,6 +14,19 @@ import type {
 
 const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 export const API_BASE_URL = (configuredUrl || 'http://localhost:8000').replace(/\/$/, '');
+let accessToken: string | null = null;
+
+export type AuthUser = {
+  id: string;
+  email: string;
+};
+
+type AuthSessionResponse = {
+  access_token: string;
+  token_type: 'bearer';
+  expires_at: string;
+  user: AuthUser;
+};
 
 export class ApiError extends Error {
   constructor(
@@ -25,6 +38,10 @@ export class ApiError extends Error {
   }
 }
 
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
 async function request<T>(path: string, init?: RequestInit, timeoutMs = 8000): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -34,6 +51,7 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = 8000): P
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...init?.headers,
       },
     });
@@ -63,6 +81,30 @@ export async function getHealth(): Promise<HealthResponse> {
   return request<HealthResponse>('/health');
 }
 
+export async function registerAccount(email: string, password: string): Promise<AuthSessionResponse> {
+  return request<AuthSessionResponse>('/api/v1/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function loginAccount(email: string, password: string): Promise<AuthSessionResponse> {
+  return request<AuthSessionResponse>('/api/v1/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function getCurrentAccount(): Promise<AuthUser> {
+  return request<AuthUser>('/api/v1/auth/me');
+}
+
+export async function logoutAccount(): Promise<void> {
+  await request<undefined>('/api/v1/auth/logout', { method: 'POST' });
+}
+
 async function imagePart(uri: string): Promise<Blob | { uri: string; name: string; type: string }> {
   if (Platform.OS === 'web') {
     const response = await fetch(uri);
@@ -89,7 +131,6 @@ export async function analyzePosture(
 }
 
 export async function createSession(payload: {
-  profile_id: string;
   view_mode: ViewMode;
   intervention_stage: InterventionStage;
   baseline: Record<string, number>;
@@ -124,17 +165,12 @@ export async function submitSessionFeedback(
   });
 }
 
-export async function getSessions(profileId: string): Promise<SessionSummary[]> {
-  const result = await request<{ items: SessionSummary[] }>(
-    `/api/v1/sessions?profile_id=${encodeURIComponent(profileId)}&limit=30`,
-  );
+export async function getSessions(): Promise<SessionSummary[]> {
+  const result = await request<{ items: SessionSummary[] }>('/api/v1/sessions?limit=30');
   return result.items;
 }
 
-export async function deleteProfileData(profileId: string): Promise<number> {
-  const result = await request<{ deleted_sessions: number }>(
-    `/api/v1/profiles/${encodeURIComponent(profileId)}/data`,
-    { method: 'DELETE' },
-  );
+export async function deleteAccountData(): Promise<number> {
+  const result = await request<{ deleted_sessions: number }>('/api/v1/account/data', { method: 'DELETE' });
   return result.deleted_sessions;
 }

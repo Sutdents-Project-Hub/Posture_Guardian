@@ -1,5 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { type Href, router } from 'expo-router';
+import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { PageShell } from '@/components/page-shell';
 import { StatusPill } from '@/components/status-pill';
@@ -8,7 +9,7 @@ import { Surface } from '@/components/ui/surface';
 import { useAppContext, type ThemePreference } from '@/context/app-context';
 import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
 import { useThemedStyles } from '@/hooks/use-app-theme';
-import { API_BASE_URL, deleteProfileData } from '@/lib/api';
+import { API_BASE_URL, deleteAccountData } from '@/lib/api';
 import { STAGE_LABELS } from '@/lib/format';
 import type { InterventionStage } from '@/types/posture';
 
@@ -31,7 +32,7 @@ const THEME_OPTIONS: {
 
 export default function SettingsScreen() {
   const {
-    profileId,
+    account,
     interventionStage,
     hapticsEnabled,
     palette,
@@ -40,22 +41,55 @@ export default function SettingsScreen() {
     setInterventionStage,
     setHapticsEnabled,
     setThemePreference,
+    signOut,
   } = useAppContext();
   const styles = useThemedStyles(createStyles);
 
   function confirmDelete() {
+    if (!account) {
+      router.push('/auth' as Href);
+      return;
+    }
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && !window.confirm('要刪除全部姿勢紀錄嗎？此操作無法復原。')) return;
+      deleteAllData();
+      return;
+    }
     Alert.alert('刪除全部姿勢紀錄？', '這會刪除工作階段、角度與摘要，且無法復原。', [
       { text: '取消', style: 'cancel' },
       {
         text: '確認刪除',
         style: 'destructive',
-        onPress: () => {
-          void deleteProfileData(profileId)
-            .then((count) => Alert.alert('已刪除', `共刪除 ${count} 個工作階段。`))
-            .catch(() => Alert.alert('目前無法刪除', '請確認 API 已啟動後再試一次。'));
-        },
+        onPress: deleteAllData,
       },
     ]);
+  }
+
+  function deleteAllData() {
+    void deleteAccountData()
+      .then((count) => Alert.alert('已刪除', `共刪除 ${count} 個工作階段。`))
+      .catch(() => Alert.alert('目前無法刪除', '請確認 API 已啟動且登入仍有效。'));
+  }
+
+  function confirmLogout() {
+    if (Platform.OS === 'web') {
+      logout();
+      return;
+    }
+    Alert.alert('要登出這台裝置嗎？', '登出後需要重新輸入帳號密碼才能存取同步紀錄。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '登出',
+        style: 'destructive',
+        onPress: logout,
+      },
+    ]);
+  }
+
+  function logout() {
+    void signOut()
+      .then(() => Alert.alert('已登出', '這台裝置已移除登入 session。'))
+      .catch(() => Alert.alert('已在本機登出', '伺服器暫時無法連線，已移除這台裝置的登入資料。'));
   }
 
   return (
@@ -166,10 +200,10 @@ export default function SettingsScreen() {
         </View>
         <View style={styles.divider} />
         <View style={styles.dataRow}>
-          <MaterialIcons name="fingerprint" size={22} color={palette.primary} />
+          <MaterialIcons name={account ? 'verified-user' : 'lock-outline'} size={22} color={palette.primary} />
           <View style={styles.dataCopy}>
-            <Text style={styles.dataLabel}>匿名本機識別碼</Text>
-            <Text selectable numberOfLines={1} style={styles.mono}>{profileId}</Text>
+            <Text style={styles.dataLabel}>帳號同步</Text>
+            <Text selectable numberOfLines={1} style={styles.mono}>{account?.email || '尚未登入'}</Text>
           </View>
         </View>
         <View style={styles.divider} />
@@ -182,12 +216,29 @@ export default function SettingsScreen() {
         </View>
       </Surface>
 
+      <Surface tone={account ? 'ai' : 'amber'} style={styles.accountCard}>
+        <View style={styles.accountCopy}>
+          <Text style={styles.accountTitle}>{account ? '帳號已登入' : '登入後保護你的趨勢'}</Text>
+          <Text style={styles.accountText}>
+            {account
+              ? '工作階段只會同步到目前帳號，登出後這台裝置不再能讀取資料。'
+              : '建立帳號後才會同步工作階段與改善趨勢；展示模式不需要登入。'}
+          </Text>
+        </View>
+        <AppButton
+          label={account ? '登出' : '登入／註冊'}
+          icon={account ? 'logout' : 'login'}
+          variant={account ? 'ghost' : 'secondary'}
+          onPress={account ? confirmLogout : () => router.push('/auth' as Href)}
+        />
+      </Surface>
+
       <Surface tone="danger" style={styles.dangerZone}>
         <View style={styles.dangerCopy}>
           <Text style={styles.dangerTitle}>刪除全部紀錄</Text>
-          <Text style={styles.dangerText}>只會刪除這個匿名識別碼底下的衍生指標與摘要。</Text>
+          <Text style={styles.dangerText}>只會刪除目前帳號底下的衍生指標與摘要，不會保存相片。</Text>
         </View>
-        <AppButton label="刪除資料" icon="delete-outline" variant="danger" onPress={confirmDelete} />
+        <AppButton label={account ? '刪除資料' : '先登入'} icon="delete-outline" variant="danger" onPress={confirmDelete} />
       </Surface>
     </PageShell>
   );
@@ -244,6 +295,10 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   settingTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.body, fontWeight: '800' },
   settingText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 19, marginTop: 3 },
   dataCard: { gap: Spacing.md },
+  accountCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  accountCopy: { flex: 1 },
+  accountTitle: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.body, fontWeight: '900' },
+  accountText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, lineHeight: 19, marginTop: 3 },
   dataRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   dataCopy: { flex: 1, minWidth: 0 },
   dataLabel: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, fontWeight: '700' },

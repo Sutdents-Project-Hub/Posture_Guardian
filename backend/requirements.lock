@@ -1,8 +1,9 @@
-# Production dependency lock captured from the Linux ARM64 container on 2026-07-16.
-# Regenerate deliberately after compatibility, container, and posture-flow verification.
+# Production dependency lock. Regenerate deliberately after compatibility, container, and posture-flow verification.
 absl-py==2.5.0
 aiosqlite==0.22.1
 alembic==1.18.5
+argon2-cffi==25.1.0
+argon2-cffi-bindings==25.1.0
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.14.2
@@ -53,6 +54,7 @@ pydantic==2.13.4
 pydantic-extra-types==2.11.1
 pydantic-settings==2.14.2
 pydantic_core==2.46.4
+pwdlib==0.3.0
 Pygments==2.20.0
 pyparsing==3.3.2
 python-dateutil==2.9.0.post0
