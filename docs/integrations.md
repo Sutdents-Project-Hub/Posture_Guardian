@@ -15,8 +15,8 @@
 |---|---|---|---|
 | MediaPipe Pose Landmarker | 節點與 visibility | Lite model、33 節點、品質拒絕與可解釋角度 | 決賽設備與真人小型驗證 |
 | 量界智算 | 去識別趨勢轉為繁中行動建議 | OpenAI-compatible Chat Completions／Responses adapter、8 秒 timeout、零 SDK 重試、安全輸出契約與 fallback | 正式 base URL、驗證方式、model ID、token 參數、額度、資料區域與保存政策 |
-| PostgreSQL | 工作階段與衍生指標 | asyncpg、Alembic baseline、Compose persistent volume | VPS backup／restore 演練 |
-| Coolify | Web、API、PostgreSQL 部署 | Compose、Dockerfiles、健康檢查、網路隔離與 log rotation | 真實 VPS、DNS、HTTPS 與資源量測 |
+| PostgreSQL | 工作階段與衍生指標 | asyncpg、Alembic baseline、Coolify managed persistent volume | VPS backup／restore 演練 |
+| Coolify | Web、API、PostgreSQL 部署 | 三個獨立 Dockerfile／Database Resources、健康檢查、內部資料庫網路 | 真實 VPS、DNS、HTTPS 與資源量測 |
 
 2026-07-16 的公開網路查詢未找到可驗證的量界智算正式 API 文件。因此程式不硬編 endpoint、不安裝未知 SDK，也不宣稱已完成真實呼叫。部署操作者必須從實際帳號後台或官方文件取得正確值。
 

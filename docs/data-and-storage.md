@@ -33,7 +33,7 @@
 - 未來產品的詳細指標與摘要保存期尚未決定，不在初始化階段猜測固定天數。
 - 設定頁已提供目前登入帳號的 API 端全部姿勢紀錄刪除；帳號刪除與資料匯出尚未實作。
 - 不做不可逆 migration 或批次刪除，除非已有備份、還原與人工確認。
-- PostgreSQL named volume 不是備份；部署前需完成 `pg_dump`／`pg_restore` 演練與離機保存。
+- Coolify PostgreSQL persistent volume 不是備份；部署前需完成 `pg_dump`／`pg_restore` 演練與離機保存。
 
 ## 測試資料
 

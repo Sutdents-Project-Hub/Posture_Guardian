@@ -5,9 +5,9 @@
 - Project name：姿勢守衛隊 Posture Guardian
 - Repository name：`Posture_Guardian`
 - Project slug：`posture-guardian`
-- Local Docker Compose project：`posture_guardian`
+- Local Docker Compose project：`posture_guardian`（整合驗證）
 - Coolify project：`posture-guardian`
-- Coolify services：`posture-guardian-web`、`posture-guardian-api`、`posture-guardian-postgres`
+- Coolify Resources：`posture-guardian-web`、`posture-guardian-api`、`posture-guardian-postgres`
 - Stage：`competition`
 - Product type：`hybrid`
 - Bootstrap mode：`executable`

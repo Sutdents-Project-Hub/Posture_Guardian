@@ -55,7 +55,7 @@
 | 7/15（已完成） | SQLAlchemy 工作階段、歷史、刪除與 AI fallback | 可儲存與讀回摘要，無原始影像 |
 | 7/16（已完成） | 暖象牙／炭墨雙主題、方角編輯式元件與 AI 證據主視覺 | Web 390px／1200px 雙尺寸與淺色／深色視覺走查通過 |
 | 7/16（已完成） | 決賽 readiness audit、5 秒平滑、有效時間事件、嚴格輸入／影像限制、AI timeout／稽核與 503 readiness | client／API 品質檢查、單元測試與本機 Compose 重新驗證通過 |
-| 7/16（已完成） | 改為 VPS／Coolify／PostgreSQL／量界智算，加入雙 API mode、密碼安全連線與 Alembic | 程式品質、瀏覽器流程、Compose、PostgreSQL migration／restart／backup-restore 已重驗 |
+| 7/16（已完成） | 改為 VPS／Coolify／PostgreSQL／量界智算，加入雙 API mode、密碼安全連線與 Alembic | 程式品質、瀏覽器流程、Dockerfile 與本機 Compose 整合、PostgreSQL migration／restart／backup-restore 已重驗；正式部署採三個獨立 Coolify Resources |
 | 7/22（已完成） | Email／密碼帳號、Argon2 hash、可撤銷 bearer session 與工作階段 ownership | API auth／越權測試、migration、client 靜態檢查與 Web export 通過；公開 HTTPS 與 proxy rate limit 仍待外部驗證 |
 | 7/16-7/18 | 真人相機小型驗證與門檻調整 | 3–5 位同意測試者完成標註與失敗紀錄 |
 | 7/19-7/21 | Coolify 外部部署與量界智算真實串接 | HTTPS、資料持久化、備份還原與真實 AI 證據通過；另取得主辦方替代計分確認 |

@@ -47,6 +47,10 @@ pnpm build
 
 複製 `.env.example` 成 `.env` 後填入本機或部署 URL；`.env` 已被忽略。
 
+## Coolify 正式部署
+
+Web 在 Coolify 是獨立的 `posture-guardian-web` Dockerfile Application：repository Base Directory 設 `/app`、Dockerfile 設 `/Dockerfile`、expose port 設 `80`，health check 為 `/`。只設定 `EXPO_PUBLIC_API_BASE_URL=https://api.<your-domain>` 為 **build-only** variable；網址變更後必須重新 build Web。前端 bundle 不得包含 PostgreSQL password、AI key 或任何其他 secret。
+
 登入 token 不使用 `EXPO_PUBLIC_*`：原生 iOS／Android 透過 Expo SecureStore 保存，Web 只保留在當前 tab 的 `sessionStorage`。公開 Web 必須使用 HTTPS，且不可在未信任的頁面嵌入 client。
 
 ## 操作流程

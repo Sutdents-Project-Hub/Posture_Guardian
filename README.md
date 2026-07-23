@@ -14,10 +14,10 @@
 |---|---|
 | GitHub repository／本機根資料夾 | `Posture_Guardian` |
 | Project slug／Coolify project | `posture-guardian` |
-| 本機 Docker Compose project | `posture_guardian` |
-| Coolify services | `posture-guardian-web`、`posture-guardian-api`、`posture-guardian-postgres` |
+| 本機 Docker Compose project | `posture_guardian`（整合驗證） |
+| Coolify Resources | `posture-guardian-web`、`posture-guardian-api`、`posture-guardian-postgres` |
 
-主要 `compose.coolify.yaml` 明確設定 `name: posture_guardian`；Compose services 使用 `web`、`api`、`postgres` 且不設定 `container_name`。
+正式 Coolify production 以三個獨立 Resources 部署：`app/Dockerfile` 建置 Web、`backend/Dockerfile` 建置 API，並使用受管 PostgreSQL Resource。`compose.coolify.yaml` 保留為本機三容器整合驗證，不作 Coolify production entrypoint。
 
 ## 核心方案
 
@@ -48,7 +48,7 @@
 | `app` | Android、iOS 與響應式 Web 使用介面 | Expo 54、React Native 0.81.5、TypeScript、Expo Camera |
 | `backend` | MediaPipe、規則引擎、資料與 AI provider | Python 3.12、FastAPI、SQLAlchemy、MediaPipe 0.10.x |
 | PostgreSQL | 工作階段與衍生指標 | async driver、密碼安全 URL 組合與 Alembic migration 已實作 |
-| Coolify | client、API 與 PostgreSQL 的主要部署方向 | Docker images／Compose 本機建置與健康檢查已通過，外部資源尚未建立 |
+| Coolify | 三個獨立的 Web、API 與 PostgreSQL Resources | Dockerfile 建置與本機三容器整合驗證已通過，外部 Resources 尚未建立 |
 | 量界智算 | 去識別摘要的個人化建議 | adapter 與 fallback 已測試；正式 API 文件、模型、額度與資料政策待確認 |
 
 本專案採固定 component roots：Expo 直接位於 `app/`，FastAPI 直接位於 `backend/`。`package.json`／`pyproject.toml` 直接位於 component 根目錄，不增加 project-name、framework-name 或其他分類包層。
@@ -117,7 +117,7 @@ cd ../backend
 ```
 
 Expo Web 靜態輸出位於 `app/dist/`；該資料夾已忽略，不提交 Git。
-`compose.coolify.yaml` 已在 Linux ARM64 容器重新完成 `web`、`api`、`postgres` 建置、健康檢查、PostgreSQL migration、restart persistence 與本機 backup／restore 演練。實際 Coolify domain、HTTPS、離機備份與量界智算真實呼叫仍必須在部署時驗收。
+兩個 Dockerfile 與 `compose.coolify.yaml` 已在 Linux ARM64 重驗 Web、API、PostgreSQL 的建置、健康檢查、migration、restart persistence 與本機 backup／restore 演練。實際 Coolify 三個 Resources、domain、HTTPS、離機備份與量界智算真實呼叫仍必須在部署時驗收。
 
 ## 環境變數與敏感資訊
 

@@ -54,10 +54,10 @@ python3.12 -m venv .venv
 - `AI_API_MODE`、`AI_TIMEOUT_SECONDS`
 - `AUTH_SESSION_DAYS`（1–30，預設 14）
 
-本機預設使用 `backend/posture_guardian.db`；Coolify 以分離的 `DB_*` 欄位連 PostgreSQL，特殊密碼字元會由 SQLAlchemy 安全編碼。啟動時自動執行 Alembic migration。註冊只儲存 Email 與 Argon2 hash，server 只保存 SHA-256 digest 的隨機 bearer token；未登入、過期 token 或他人 session ID 都不能讀寫工作階段。`AI_PROVIDER=liangjie` 必須同時具備完整 base URL、key 與 model；預設 Chat Completions，也可依正式文件切 Responses。外部呼叫預設 8 秒、SDK 零重試，少於 10 分鐘有效資料不呼叫付費 AI；輸出不符合三段式、字數或非醫療契約時改用 fallback。
+本機預設使用 `backend/posture_guardian.db`；Coolify 的獨立 `posture-guardian-api` Resource 以分離的 `DB_*` 欄位連同 environment 的 `posture-guardian-postgres` internal host，特殊密碼字元會由 SQLAlchemy 安全編碼。`DB_PASSWORD` 與 `AI_API_KEY` 是 runtime secrets，`CORS_ORIGINS` 只能填完整 HTTPS Web origin。啟動時自動執行 Alembic migration。註冊只儲存 Email 與 Argon2 hash，server 只保存 SHA-256 digest 的隨機 bearer token；未登入、過期 token 或他人 session ID 都不能讀寫工作階段。`AI_PROVIDER=liangjie` 必須同時具備完整 base URL、key 與 model；預設 Chat Completions，也可依正式文件切 Responses。外部呼叫預設 8 秒、SDK 零重試，少於 10 分鐘有效資料不呼叫付費 AI；輸出不符合三段式、字數或非醫療契約時改用 fallback。
 
 ## 部署限制
 
-- Dockerfile、production dependency lock、Alembic、port 8000、`/live` 與 `/health` 已設定；本次架構轉換後的 Linux ARM64 container build、PostgreSQL migration 與健康檢查已驗證，實際 Coolify 環境仍待驗證。
+- Dockerfile、production dependency lock、Alembic、port 8000、`/live` 與 `/health` 已設定；正式 Coolify 以 `/backend` Dockerfile Resource 部署，Linux ARM64 container build、PostgreSQL migration 與健康檢查已驗證，實際 Coolify Resource 仍待驗證。
 - 不得保存原始影格或在 log 中輸出影像、secret、prompt 與個資。
 - 外部 AI 失效不應阻擋核心姿勢判定。

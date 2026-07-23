@@ -33,7 +33,7 @@
 
 ## 目前獲獎準備度
 
-- 程式垂直切片、離線展示、隱私邊界、嚴格輸入、AI fallback、Compose 與 migration 已具可重現證據。
+- 程式垂直切片、離線展示、隱私邊界、嚴格輸入、AI fallback、Dockerfile／本機 Compose 整合與 migration 已具可重現證據；正式部署規格為三個獨立 Coolify Resources。
 - 真實 Coolify VPS、DNS、HTTPS、PostgreSQL backup／restore、量界智算 endpoint／model／成功呼叫仍待外部驗證。
 - 最大評分風險是 Azure 25% 的替代資格，而不是前端功能；未取得主辦方確認前必須在答辯中誠實說明。
 - 簡報 35% 仍需計時簡報、真人 demo、備援錄影、全員 Q&A 與完整彩排。

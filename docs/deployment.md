@@ -1,125 +1,153 @@
-# Coolify／VPS 部署手冊
+# Coolify／VPS 正式部署手冊
 
-## 目前狀態
+## 目前狀態與正式架構
 
-- 部署目標已確定為自有 VPS 上的 Coolify；repository 尚未連到實際 Coolify、DNS 或 production secret。
-- `compose.coolify.yaml` 是部署 single source of truth，包含 `web`、`api`、`postgres`、健康檢查、隔離網路、log rotation 與 PostgreSQL persistent volume。
-- Python、Node、Nginx、PostgreSQL image 與 MediaPipe model 都固定到本次已驗證 digest／版本；升級時需重新跑本文件的完整驗證。
-- API 啟動前會執行 Alembic migration；先前以 `create_all` 建立的完整 MVP schema 會保留資料並標記 baseline。
-- 本機 Linux ARM64 已重驗三個 containers、migration、PostgreSQL restart persistence 與一次 backup／restore；實際 VPS 與離機備份仍未驗證。
-- 量界智算採可設定的 OpenAI-compatible adapter；真實 endpoint、model ID、key 與 API 模式尚待量界智算帳號文件確認。
+- 部署目標是自有 VPS 上的 Coolify；Posture Guardian 的外部 Resources、DNS、production secret 與離機備份尚未建立或驗證。
+- 正式 production 架構固定為同一個 Coolify project／environment 的三個**獨立 Resources**：
+  1. `posture-guardian-postgres`：Coolify PostgreSQL 17 Database。
+  2. `posture-guardian-api`：private GitHub repository 的 `/backend` Dockerfile Application。
+  3. `posture-guardian-web`：同一 repository 的 `/app` Dockerfile Application。
+- `app/Dockerfile` 與 `backend/Dockerfile` 是正式部署 image 的唯一建置來源；兩者已固定基底 image／依賴，且分別提供 `/` 與 `/health` Docker health check。
+- `compose.coolify.yaml` 保留為三容器拓撲、migration、持久化與備份還原的本機整合驗證規格，**不作為 Coolify production Resource**；它不能取代下列各 Resource 的獨立網域、runtime secret、資料庫備份與回滾設定。
+- API 啟動前會執行 `alembic upgrade head`；migration 失敗時不開始服務。量界智算正式 endpoint、model ID、key 與 API mode 仍待帳號文件確認。
 
-## 命名契約
+## 命名與網路契約
 
-- Repository／本機根資料夾：`Posture_Guardian`
-- Coolify project：`posture-guardian`
-- Compose project：`posture_guardian`
-- Compose services：`web`、`api`、`postgres`；不設定 `container_name`
-- 建議 Coolify service 顯示名稱：`posture-guardian-web`、`posture-guardian-api`、`posture-guardian-postgres`
+| 用途 | 正式值／規則 |
+|---|---|
+| Repository | `Posture_Guardian` |
+| Coolify project | `posture-guardian` |
+| Environment | `production` |
+| Database Resource | `posture-guardian-postgres` |
+| API Resource | `posture-guardian-api` |
+| Web Resource | `posture-guardian-web` |
+| API 公開網址 | `https://api.<your-domain>`，不含 path 或尾斜線 |
+| Web 公開網址 | `https://app.<your-domain>`，不含 path 或尾斜線 |
 
-## 建立 Coolify Resource
+三個 Resources 必須位於相同 Coolify project、environment 與 server destination。PostgreSQL 不設定 public port 或 domain；API 只能透過該 database Resource 的內部連線資訊存取資料庫。Web 與 API 的公開 domain、DNS、TLS 及 Cloudflare 設定由部署操作者完成，不能以範例網址取代實際值。
 
-1. 在 VPS 的 Coolify 建立 project `posture-guardian`。
-2. 新增 Docker Compose resource，repository base directory 使用根目錄，Compose 檔指定 `/compose.coolify.yaml`。
-3. 在 Coolify 的 `web` domain 欄填入 `https://app.example.com`。
-4. 在 `api` domain 欄填入 `https://api.example.com:8000`；`8000` 是容器 target port，公開仍由 HTTPS 443 存取。
-5. `postgres` 不綁 domain、不設定 public port；它只存在 internal backend network。
-6. 完成 DNS 後再部署，等待三個 service healthy。
+## 部署前準備
 
-以上 domain 只為格式範例，部署時換成實際網域。Coolify Compose domain 規則以官方文件為準。
+1. 在 Coolify Source 使用團隊的 GitHub App，選 `Sutdents Project`，並只授權 `Posture_Guardian`。
+2. 準備 Web 與 API 的正式 HTTPS domain；DNS 尚未生效前，可先不部署或使用 Coolify 產生的測試 domain，正式 domain 確定後必須同步重建 Web。
+3. 在密碼管理器或 Coolify 產生獨立、高強度 PostgreSQL 密碼；不可重用其他 Resource 的 password，也不可提交至 repository。
+4. 量界智算尚未完成帳號設定時，採 `AI_PROVIDER=fallback`；不要填入猜測的 endpoint、model 或 key。
+5. production 寫入資料前，先設定 Coolify PostgreSQL backup 的加密、離機目的地與保存期限，並安排一次 restore 演練。
 
-## Coolify 環境變數
+## 1. 建立 PostgreSQL Resource
 
-必填：
+在 `posture-guardian / production` 新增 Coolify PostgreSQL Database：
 
-| 變數 | 類型 | 範例／規則 |
-|---|---|---|
-| `POSTGRES_PASSWORD` | runtime secret | 使用密碼管理器產生；程式會安全 URL encode 特殊字元 |
-| `WEB_ORIGIN` | runtime public config | `https://app.example.com`，不可有 path 或尾斜線 |
-| `PUBLIC_API_BASE_URL` | Web build variable | `https://api.example.com`，不可有尾斜線 |
-| `AUTH_SESSION_DAYS` | API runtime config | 1–30，預設 `14`；變更後需重啟 API |
+| 欄位 | 值／規則 |
+|---|---|
+| Name | `posture-guardian-postgres` |
+| Version | `17` |
+| Database | `posture_guardian` |
+| Username | `posture_guardian` |
+| Password | Coolify secret；高強度且不重用 |
+| Public accessibility／Public port | 關閉 |
+| Persistent storage | 保留 Coolify database 預設 persistent volume |
 
-量界智算尚未填妥前：
+等待 database healthy 後，從 Coolify 的 internal connection details 取得 host、port、database、username 與 password。API 使用個別的 `DB_*` 變數，不把完整 connection URL 放進公開前端，也不為了連線問題公開 PostgreSQL。
 
-```env
+## 2. 建立 API Dockerfile Application
+
+新增 Private Repository Application，Source 選 `Sutdents Project`、repository 選 `Posture_Guardian`、branch 選 `main`：
+
+| Coolify 欄位 | 值 |
+|---|---|
+| Name | `posture-guardian-api` |
+| Build Pack | Dockerfile |
+| Base Directory | `/backend` |
+| Dockerfile Location | `/Dockerfile`（若 UI 顯示此欄，路徑相對 Base Directory） |
+| Port Exposes | `8000` |
+| Domain | `https://api.<your-domain>` |
+| Health check | `/health`；Dockerfile 亦內建相同 readiness health check |
+| Auto Deploy | 建議在首次成功部署與 smoke test 後開啟 |
+
+以下值全部是 API runtime variables；`DB_PASSWORD`、`AI_API_KEY` 必須以 Coolify secret 保存，絕不可標成 Web build variable：
+
+```dotenv
+APP_ENV=production
+DB_HOST=<posture-guardian-postgres internal host>
+DB_PORT=5432
+DB_NAME=posture_guardian
+DB_USER=posture_guardian
+DB_PASSWORD=<Coolify PostgreSQL secret>
+CORS_ORIGINS=https://app.<your-domain>
 AI_PROVIDER=fallback
 AI_API_MODE=chat_completions
 AI_TIMEOUT_SECONDS=8
 AUTH_SESSION_DAYS=14
 ```
 
-取得量界智算正式帳號文件後：
+- `DB_HOST` 必須使用 Coolify database Resource 的 internal host，不能使用 public IP 或 localhost。
+- `CORS_ORIGINS` 只接受完整 HTTPS Web origin；不要填 `*`、path、尾斜線或 API domain。
+- 使用量界智算時，再額外設定 `AI_PROVIDER=liangjie`、`AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL`，並依正式文件確認 `AI_API_MODE`。URL、key 或 model 任一缺失時 API 會拒絕啟動。
+- Docker image 會下載固定的 MediaPipe 模型並在啟動時跑 Alembic migration；不設定額外 pre／post migration command，避免重複執行。
 
-```env
-AI_PROVIDER=liangjie
-AI_BASE_URL=https://provider-documentation.example/v1
-AI_API_KEY=<Coolify runtime secret>
-AI_MODEL=<provider model id>
-AI_API_MODE=chat_completions
-AI_TIMEOUT_SECONDS=8
+## 3. 建立 Web Dockerfile Application
+
+新增第二個 Private Repository Application，使用同一 Source、repository 與 branch：
+
+| Coolify 欄位 | 值 |
+|---|---|
+| Name | `posture-guardian-web` |
+| Build Pack | Dockerfile |
+| Base Directory | `/app` |
+| Dockerfile Location | `/Dockerfile`（若 UI 顯示此欄，路徑相對 Base Directory） |
+| Port Exposes | `80` |
+| Domain | `https://app.<your-domain>` |
+| Health check | `/`；Dockerfile 內建 Nginx health check |
+| Auto Deploy | 建議在首次成功部署與 smoke test 後開啟 |
+
+Web 只設定一個公開的 **build-only** variable：
+
+```dotenv
+EXPO_PUBLIC_API_BASE_URL=https://api.<your-domain>
 ```
 
-- `AI_BASE_URL` 必須是文件指定的完整 base URL；程式不會自行補 `/v1` 或 `/openai/v1`。
-- 只有供應商明確支援 Responses API 時，才改成 `AI_API_MODE=responses`。
-- production 的外部 `AI_BASE_URL` 必須使用 HTTPS，且不可包含帳密、query 或 fragment。
-- `AI_PROVIDER=liangjie` 缺少 URL、key 或 model 時，API 會拒絕啟動，避免 UI 冒充 AI 已啟用。
-- `AI_API_KEY` 與 `POSTGRES_PASSWORD` 都是 runtime secret，不可勾成 Web build variable；`PUBLIC_API_BASE_URL` 則必須在 Web build 時存在，修改後要 rebuild。
+在 Coolify 勾選 Build Variable、取消 Runtime Variable。此值會編入 Expo Web bundle，不能放 password、token、AI key 或 database URL；API domain 變更後，必須重新建置並部署 Web。
 
-## PostgreSQL 與 migration
+## 第一次部署與驗收順序
 
-- Compose 以 `DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USER`、`DB_PASSWORD` 傳給 API，再由 SQLAlchemy 安全建立連線 URL。
-- API 啟動時執行 `alembic upgrade head`；migration 失敗時不開始服務。
-- 部署後可在 API container 檢查：`alembic current`，預期為 `20260722_01 (head)`。
-- Named volume 只提供持久化，不等於備份；Coolify 可能替實際 volume 名稱加入 resource UUID，不可用猜測的 volume 名操作 production。
-- 更改 `POSTGRES_PASSWORD` 環境變數不會自動旋轉既有 PostgreSQL role 密碼。輪替時先在資料庫執行 `ALTER ROLE`，再更新 Coolify secret，並立即驗證 API readiness。
-
-## 備份與還原門檻
-
-上正式資料前：
-
-1. 以 Coolify database backup 或排程 `pg_dump --format=custom --no-owner --no-acl` 建立備份。
-2. 備份送到加密、與 VPS 分離的儲存位置，設定合理保存期限。
-3. 在臨時 PostgreSQL database 執行一次 `pg_restore`，確認不是只有「有備份檔」而是真的可還原。
-4. PostgreSQL major version、Compose project 名稱、volume 或 migration 變更前再做一次備份。
-
-## 部署後驗證
+1. PostgreSQL 顯示 healthy，並確認 API 可讀到其內部連線資訊。
+2. 設定 API runtime variables，Deploy API；確認 Alembic migration 完成與 `/health` 回 HTTP 200。
+3. 設定 Web 的 build-only API URL，Deploy Web；確認首頁、登入、展示模式與相機權限的 HTTPS 行為。
+4. 用 Web 註冊測試帳號，完成校準、工作階段、完成摘要與歷史查詢；重啟 API 後確認資料仍存在。
+5. 以錯誤 Origin 重測 CORS，確認不回傳 `Access-Control-Allow-Origin`；再驗證量界智算 timeout 時顯示透明 fallback。
+6. 執行一次 backup，還原至隔離 PostgreSQL Resource 後確認資料可讀回，才把正式資料視為可恢復。
 
 ```bash
-curl -fsS https://api.example.com/live
-curl -fsS https://api.example.com/health
-curl -fsS https://app.example.com/
-```
-
-`/health` 應回報 PostgreSQL、Pose model、AI 設定狀態；它不會呼叫付費 AI，也不代表量界智算已成功推論。真實 AI 驗證需完成至少 10 分鐘有效工作階段，確認摘要 provider=`liangjie` 並核對去敏 log。
-
-CORS 正向測試：
-
-```bash
-curl -i -X OPTIONS https://api.example.com/api/v1/sessions \
-  -H 'Origin: https://app.example.com' \
+curl -fsS https://api.<your-domain>/live
+curl -fsS https://api.<your-domain>/health
+curl -fsSI https://app.<your-domain>/
+curl -i -X OPTIONS https://api.<your-domain>/api/v1/sessions \
+  -H 'Origin: https://app.<your-domain>' \
   -H 'Access-Control-Request-Method: POST'
 ```
 
-再以錯誤 Origin 重測，確認沒有 `Access-Control-Allow-Origin`。最後用決賽手機人工驗證 HTTPS 相機權限、正／側面校準、完成／查詢／刪除工作階段、PostgreSQL restart 後資料仍在，以及量界智算 timeout 時透明 fallback。
+`/health` 只檢查 PostgreSQL、Pose model 與 AI 設定，不呼叫付費 AI。真實量界智算成功仍須以至少 10 分鐘的有效工作階段、provider=`liangjie` 與去敏 log 另外驗收。
 
 ## 公開服務安全邊界
 
-- API 已提供 Argon2 密碼雜湊、可撤銷 bearer session 與 resource ownership；API response 設定 `no-store`，Web Nginx 為入口文件設定無快取、為靜態資產設定快取與 Content Security Policy。Web token 只在當前 browser tab 保存，原生 token 只在 SecureStore 保存。
-- 對公網開放前，仍必須先在 Coolify／反向代理加入登入端點與影像端點各自的 rate limit、request timeout、body limit、TLS、監控與稽核；未完成時只可在受控網路展示。姿態影格流量和 AI 完成呼叫不可使用同一個過低限制。
-- Email 驗證、忘記密碼、帳號永久刪除與未成年同意尚未實作；不能把目前帳號流程當作完整公開未成年帳號服務。
-- production `/docs`／`openapi.json` 應由反向代理限制，避免把測試介面無條件公開。
+- API 已提供 Argon2 密碼雜湊、可撤銷 bearer session 與 resource ownership；Web token 只在當前 browser tab 保存，原生 token 只在 SecureStore 保存。
+- 反向代理／Coolify 必須在公開前設定 TLS、登入端點與影像端點各自的 rate limit、request timeout、body limit、監控與稽核。姿態影格與 AI 完成呼叫不能套用同一個過低限制。
+- Email 驗證、忘記密碼、帳號永久刪除與未成年同意尚未實作；現階段只可在受控競賽展示條件使用，不能宣稱為完整公開未成年帳號服務。
+- production `/docs` 與 `/openapi.json` 應由反向代理限制存取；PostgreSQL 永遠不公開到 Internet。
 
-## 發布與回滾
+## 發布、回滾與備份
 
-- 每次部署記錄 Git commit、環境名稱、migration revision、image、人工 smoke test 與前一個可用 deployment。
-- API production 套件由 `backend/requirements.lock` 固定；依賴更新必須連同 lock、測試與候選映像一起審查，避免 Coolify 重建時漂移。
-- App/API image 可回滾；已執行的資料庫 migration 必須依 migration 性質處理，不能只回滾 container。
-- migration、還原、DNS、正式部署與 production 資料操作仍需部署操作者明確執行；本文件不代表已建立外部資源。
+- Web 與 API 各自使用 Dockerfile image，確認健康後才開啟 Auto Deploy；`main` 新 commit 會分別重新建置受影響的 application，database volume 不會被 application deploy 重建。
+- 每次 deployment 記錄 Git commit、Resource、migration revision、image、正式 domain 與人工 smoke test；API rollback 不能單獨回滾已不相容的 schema migration。
+- PostgreSQL persistent volume 不等於備份。major version、資料庫設定、migration 或 password rotation 前先備份；rotation 需先更新 database role，再更新 API 的 `DB_PASSWORD` secret 並立即驗證 `/health`。
+- migration、還原、DNS、secret rotation 與 production 資料操作仍需部署操作者明確執行；本文件不代表這些外部操作已完成。
 
 ## 官方參考
 
-- [Coolify Docker Compose](https://coolify.io/docs/knowledge-base/docker/compose)
+- [Coolify Dockerfile Build Pack](https://coolify.io/docs/applications/build-packs/dockerfile)
+- [Coolify GitHub Auto Deploy](https://coolify.io/docs/applications/ci-cd/github/auto-deploy)
 - [Coolify environment variables](https://coolify.io/docs/knowledge-base/environment-variables)
-- [Coolify health checks](https://coolify.io/docs/knowledge-base/health-checks)
+- [Coolify databases](https://coolify.io/docs/databases/)
 - [Coolify database backups](https://coolify.io/docs/databases/backups)
 - [Expo Web 自架與輸出](https://docs.expo.dev/guides/publishing-websites/)

@@ -8,7 +8,7 @@
 
 你**不需要**安裝 Docker、Python、PostgreSQL、MediaPipe、量界智算，也不需要啟動 `backend/`。以下內容都屬於帶隊者負責的後端、資料庫或部署範圍，請不要修改：
 
-- `backend/`、`compose.coolify.yaml`、`Dockerfile`、`migrations/` 與任何資料庫檔案。
+- `backend/`、`compose.coolify.yaml`（本機整合驗證）、`Dockerfile`、`migrations/` 與任何資料庫檔案。
 - `.env`、API key、密碼、token、正式網址或任何秘密；這些不能放進 GitHub。
 - `pnpm-lock.yaml`、`package.json`、`app.json`、`nginx.conf`，除非帶隊者明確指派你調整。
 - 姿勢門檻、校準秒數、提醒秒數、API 路徑與資料格式；這些會影響功能與安全性，先交給帶隊者判斷。
@@ -263,7 +263,7 @@ Posture_Guardian/
 │   └── pnpm-lock.yaml           # 鎖定套件版本，不要手動編輯
 ├── backend/                     # 帶隊者負責；不要修改
 ├── docs/                        # 專案說明與本教學
-└── compose.coolify.yaml         # 部署設定；不要修改
+└── compose.coolify.yaml         # 本機三容器整合驗證；不要修改
 ```
 
 ### 常見工作對照表

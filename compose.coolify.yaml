@@ -1,3 +1,5 @@
+# Retained for local three-container integration verification only.
+# Coolify production uses separate Dockerfile Web/API and managed PostgreSQL Resources.
 name: posture_guardian
 
 x-logging: &default-logging
