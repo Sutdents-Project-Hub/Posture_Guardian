@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
+import { RequireAuthenticated } from '@/components/auth-guard';
 import { PostureOverlay } from '@/components/posture-overlay';
 import { ScoreGauge } from '@/components/score-gauge';
 import { StatusPill } from '@/components/status-pill';
@@ -72,7 +73,15 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-export default function SessionScreen() {
+export default function SessionRoute() {
+  return (
+    <RequireAuthenticated>
+      <SessionScreen />
+    </RequireAuthenticated>
+  );
+}
+
+function SessionScreen() {
   const { palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ mode?: string; demo?: string }>();

@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
 import { AuthForm } from '@/components/auth-form';
+import { RequireSignedOut } from '@/components/auth-guard';
 import { StatusPill } from '@/components/status-pill';
 import { AppButton } from '@/components/ui/app-button';
 import { Surface } from '@/components/ui/surface';
@@ -24,7 +25,15 @@ import { ApiError } from '@/lib/api';
 
 type Mode = 'login' | 'register';
 
-export default function AuthScreen() {
+export default function AuthRoute() {
+  return (
+    <RequireSignedOut>
+      <AuthScreen />
+    </RequireSignedOut>
+  );
+}
+
+function AuthScreen() {
   const { palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const { signIn, signUp } = useAppContext();
@@ -72,14 +81,6 @@ export default function AuthScreen() {
         style={styles.keyboard}
         contentContainerStyle={styles.keyboardContent}>
         <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="返回首頁"
-            onPress={() => router.replace('/(tabs)')}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-            <MaterialIcons name="arrow-back" size={22} color={palette.ink} />
-            <Text style={styles.backLabel}>返回</Text>
-          </Pressable>
           <StatusPill label="帳號同步" tone="info" />
         </View>
 
@@ -211,11 +212,9 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
   },
-  backButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, minHeight: 44, paddingHorizontal: Spacing.xs },
-  backLabel: { fontFamily: Typography.family, color: palette.ink, fontSize: Typography.small, fontWeight: '800' },
   content: { width: '100%', maxWidth: 560, alignSelf: 'center', padding: Spacing.lg, paddingTop: Spacing.xl, gap: Spacing.md },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   brandName: { fontFamily: Typography.displayFamily, color: palette.ink, fontSize: Typography.h3, fontWeight: '700' },

@@ -102,8 +102,8 @@ export default function HomeScreen() {
           </View>
           <View style={[styles.heroActions, !isWide && styles.heroActionsNarrow]}>
             <AppButton
-              label={account ? '開始側面偵測' : '登入後開始偵測'}
-              icon={account ? 'center-focus-strong' : 'lock-outline'}
+              label="開始側面偵測"
+              icon="center-focus-strong"
               fullWidth={!isWide}
               onPress={() => start('side')}
             />
