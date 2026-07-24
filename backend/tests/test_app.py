@@ -92,6 +92,7 @@ def test_session_lifecycle_stores_only_derived_values() -> None:
                 "is_valid": True,
                 "threshold_exceeded": True,
                 "event_active": True,
+                "reminder_triggered": True,
                 "posture_score": 42,
                 "metrics": {"neck_flexion": 23},
                 "deviations": {"neck_flexion": 18},
@@ -105,6 +106,11 @@ def test_session_lifecycle_stores_only_derived_values() -> None:
         assert completed.status_code == 200
         body = completed.json()
         assert body["summary"]["posture_event_count"] == 1
+        assert body["summary"]["poor_seconds"] == 1
+        assert body["summary"]["attention_seconds"] == 0
+        assert body["summary"]["reminder_count"] == 1
+        assert body["summary"]["coverage_mode"] == "upper_body"
+        assert body["summary"]["room_mode"] is False
         assert body["summary"]["primary_issue"] == "頭頸前傾角度偏移"
         assert body["summary"]["insight_provider"] == "fallback"
 
@@ -175,6 +181,19 @@ def test_session_input_rejects_mismatched_or_non_finite_metrics() -> None:
             headers=headers,
         )
         assert bad_metric.status_code == 422
+
+        adaptive = client.post(
+            "/api/v1/sessions",
+            json={
+                "view_mode": "auto",
+                "coverage_mode": "full_body",
+                "room_mode": True,
+                "intervention_stage": "starter",
+                "baseline": {"neck_flexion": 5, "hip_tilt": 1},
+            },
+            headers=headers,
+        )
+        assert adaptive.status_code == 201
         client.delete("/api/v1/account/data", headers=headers)
 
 
@@ -235,3 +254,94 @@ def test_degraded_readiness_returns_service_unavailable(
         assert response.status_code == 503
         assert response.json()["status"] == "degraded"
         assert client.get("/live").status_code == 200
+
+
+def test_weekly_report_is_owned_duration_weighted_and_read_only() -> None:
+    with TestClient(app) as client:
+        headers, _ = register(client)
+        created = client.post(
+            "/api/v1/sessions",
+            json={
+                "view_mode": "auto",
+                "coverage_mode": "full_body",
+                "room_mode": True,
+                "intervention_stage": "starter",
+                "baseline": {"head_tilt": 0, "hip_tilt": 0},
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201
+        session_id = created.json()["id"]
+        samples = [
+            {
+                "duration_seconds": 2,
+                "is_valid": True,
+                "posture_score": 95,
+                "metrics": {"head_tilt": 0},
+                "deviations": {"head_tilt": 0},
+            },
+            {
+                "duration_seconds": 3,
+                "is_valid": True,
+                "threshold_exceeded": True,
+                "posture_score": 70,
+                "metrics": {"head_tilt": 12},
+                "deviations": {"head_tilt": 12},
+                "reasons": ["頭部側傾角度偏移"],
+            },
+            {
+                "duration_seconds": 4,
+                "is_valid": True,
+                "threshold_exceeded": True,
+                "event_active": True,
+                "reminder_triggered": True,
+                "posture_score": 40,
+                "metrics": {"head_tilt": 18},
+                "deviations": {"head_tilt": 18},
+                "reasons": ["頭部側傾角度偏移"],
+            },
+            {
+                "duration_seconds": 1,
+                "is_valid": False,
+                "posture_score": 0,
+            },
+        ]
+        for sample in samples:
+            response = client.post(
+                f"/api/v1/sessions/{session_id}/samples",
+                json=sample,
+                headers=headers,
+            )
+            assert response.status_code == 200
+        completed = client.post(f"/api/v1/sessions/{session_id}/complete", headers=headers)
+        assert completed.status_code == 200
+
+        report = client.get(
+            "/api/v1/reports/weekly?timezone=Asia%2FTaipei",
+            headers=headers,
+        )
+        assert report.status_code == 200
+        body = report.json()
+        assert body["timezone"] == "Asia/Taipei"
+        assert body["session_count"] >= 1
+        assert body["valid_seconds"] >= 9
+        assert body["reminder_count"] >= 1
+        assert body["status_distribution"]["good_seconds"] >= 2
+        assert body["status_distribution"]["attention_seconds"] >= 3
+        assert body["status_distribution"]["poor_seconds"] >= 4
+        assert body["status_distribution"]["invalid_seconds"] >= 1
+        assert len(body["time_periods"]) == 4
+        assert sum(period["valid_seconds"] for period in body["time_periods"]) >= 9
+        assert body["insight_provider"] == "fallback"
+
+        other_headers, _ = register(client)
+        other_report = client.get("/api/v1/reports/weekly", headers=other_headers)
+        assert other_report.status_code == 200
+        assert other_report.json()["session_count"] == 0
+        assert client.get(
+            "/api/v1/reports/weekly?timezone=not-a-timezone",
+            headers=headers,
+        ).status_code == 422
+
+        client.delete("/api/v1/account/data", headers=headers)
+        client.delete("/api/v1/account/data", headers=other_headers)

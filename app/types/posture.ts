@@ -1,4 +1,8 @@
 export type ViewMode = 'side' | 'front';
+export type RequestedViewMode = ViewMode | 'auto';
+export type CoverageMode = 'upper_body' | 'full_body';
+export type DistanceStatus = 'near' | 'recommended' | 'far' | 'unknown';
+export type FramingStatus = 'complete' | 'partial' | 'out_of_frame';
 export type InterventionStage = 'starter' | 'advanced' | 'intensive';
 export type AnalysisStatus = 'calibrating' | 'good' | 'attention' | 'invalid';
 export type InsightProvider = 'liangjie' | 'fallback' | 'foundry';
@@ -13,7 +17,16 @@ export type Landmark = {
 };
 
 export type AnalysisResponse = {
-  view_mode: ViewMode;
+  requested_view_mode: RequestedViewMode;
+  view_mode: ViewMode | null;
+  coverage_mode: CoverageMode;
+  distance: DistanceStatus;
+  framing: FramingStatus;
+  subject_scale: number;
+  image_width: number;
+  image_height: number;
+  quality_issues: string[];
+  pose_count: number;
   valid: boolean;
   quality: number;
   status: AnalysisStatus;
@@ -40,14 +53,19 @@ export type HealthResponse = {
 
 export type SessionSummary = {
   id: string;
-  view_mode: ViewMode;
+  view_mode: RequestedViewMode;
+  coverage_mode: CoverageMode;
+  room_mode: boolean;
   intervention_stage: InterventionStage;
   started_at: string;
   ended_at: string | null;
   valid_seconds: number;
   good_seconds: number;
+  attention_seconds: number;
+  poor_seconds: number;
   invalid_seconds: number;
   posture_event_count: number;
+  reminder_count: number;
   average_score: number;
   good_posture_rate: number;
   primary_issue: string | null;
@@ -66,6 +84,7 @@ export type SessionSample = {
   is_valid: boolean;
   threshold_exceeded: boolean;
   event_active: boolean;
+  reminder_triggered: boolean;
   posture_score: number;
   metrics: Record<string, number>;
   deviations: Record<string, number>;
@@ -74,3 +93,38 @@ export type SessionSample = {
 
 export type ReminderFit = 'just_right' | 'too_frequent' | 'easy_to_miss';
 export type SessionFeeling = 'interrupted' | 'in_control' | 'neutral';
+
+export type WeeklyTimePeriod = {
+  period: 'overnight' | 'morning' | 'afternoon' | 'evening';
+  label: string;
+  valid_seconds: number;
+  good_seconds: number;
+  attention_seconds: number;
+  poor_seconds: number;
+  good_posture_rate: number;
+  reminder_count: number;
+};
+
+export type WeeklyReport = {
+  period_start: string;
+  period_end: string;
+  timezone: string;
+  session_count: number;
+  valid_seconds: number;
+  good_seconds: number;
+  attention_seconds: number;
+  poor_seconds: number;
+  invalid_seconds: number;
+  reminder_count: number;
+  good_posture_rate: number;
+  status_distribution: {
+    good_seconds: number;
+    attention_seconds: number;
+    poor_seconds: number;
+    invalid_seconds: number;
+  };
+  time_periods: WeeklyTimePeriod[];
+  primary_issue: string | null;
+  insight_text: string;
+  insight_provider: InsightProvider;
+};

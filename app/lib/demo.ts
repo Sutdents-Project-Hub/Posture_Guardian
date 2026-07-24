@@ -1,4 +1,4 @@
-import type { AnalysisResponse, Landmark, ViewMode } from '@/types/posture';
+import type { AnalysisResponse, Landmark, RequestedViewMode, ViewMode } from '@/types/posture';
 
 function demoLandmarks(viewMode: ViewMode, elapsedSeconds: number, attention: boolean): Landmark[] {
   const points: Record<number, [number, number]> =
@@ -42,10 +42,11 @@ function demoLandmarks(viewMode: ViewMode, elapsedSeconds: number, attention: bo
 }
 
 export function createDemoAnalysis(
-  viewMode: ViewMode,
+  requestedViewMode: RequestedViewMode,
   elapsedSeconds: number,
   baseline?: Record<string, number>,
 ): AnalysisResponse {
+  const viewMode: ViewMode = requestedViewMode === 'auto' ? 'side' : requestedViewMode;
   const cycle = elapsedSeconds % 24;
   const attention = Boolean(baseline) && cycle >= 4 && cycle < 17;
   const noise = Math.sin(elapsedSeconds * 1.7) * 0.5;
@@ -54,17 +55,20 @@ export function createDemoAnalysis(
       ? {
           neck_flexion: 6 + noise + (attention ? 18 : 0),
           trunk_flexion: 2 + noise + (attention ? 13 : 0),
+          knee_flexion: 88 + noise + (attention ? 14 : 0),
         }
       : {
           head_tilt: 1 + noise + (attention ? 12 : 0),
           shoulder_tilt: 0.5 + noise + (attention ? 7 : 0),
           trunk_lateral: 1 + noise + (attention ? 10 : 0),
+          hip_tilt: 0.5 + noise + (attention ? 7 : 0),
+          knee_tilt: 0.8 + noise + (attention ? 8 : 0),
         };
   const metrics = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, +value.toFixed(2)]));
   const thresholds: Record<string, number> =
     viewMode === 'side'
-      ? { neck_flexion: 15, trunk_flexion: 10 }
-      : { head_tilt: 10, shoulder_tilt: 5, trunk_lateral: 8 };
+      ? { neck_flexion: 15, trunk_flexion: 10, knee_flexion: 15 }
+      : { head_tilt: 10, shoulder_tilt: 5, trunk_lateral: 8, hip_tilt: 6, knee_tilt: 8 };
   const deviations = baseline
     ? Object.fromEntries(
         Object.entries(metrics).map(([key, value]) => [key, +(value - (baseline[key] ?? value)).toFixed(2)]),
@@ -76,7 +80,16 @@ export function createDemoAnalysis(
       : ['頭部側傾角度偏移', '左右肩線傾斜']
     : [];
   return {
+    requested_view_mode: requestedViewMode,
     view_mode: viewMode,
+    coverage_mode: 'full_body',
+    distance: 'recommended',
+    framing: 'complete',
+    subject_scale: 0.76,
+    image_width: 1280,
+    image_height: 960,
+    quality_issues: [],
+    pose_count: 1,
     valid: true,
     quality: 0.98,
     status: baseline ? (attention ? 'attention' : 'good') : 'calibrating',

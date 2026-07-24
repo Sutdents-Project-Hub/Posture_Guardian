@@ -25,7 +25,7 @@ RUN python -m pip install --no-deps . \
     && useradd --create-home --uid 10001 posture \
     && chown -R posture:posture /app
 
-ENV POSE_MODEL_PATH=/app/models/pose_landmarker_lite.task \
+ENV POSE_MODEL_PATH=/app/models/pose_landmarker_full.task \
     MIGRATION_ROOT=/app
 
 USER posture

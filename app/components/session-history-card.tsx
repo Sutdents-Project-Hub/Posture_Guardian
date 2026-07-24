@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Surface } from '@/components/ui/surface';
 import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
 import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
-import { formatDate, formatDuration, VIEW_LABELS } from '@/lib/format';
+import { CAPTURE_MODE_LABELS, COVERAGE_LABELS, formatDate, formatDuration } from '@/lib/format';
 import type { SessionSummary } from '@/types/posture';
 
 export function SessionHistoryCard({ session }: { session: SessionSummary }) {
@@ -15,10 +15,16 @@ export function SessionHistoryCard({ session }: { session: SessionSummary }) {
     <Surface style={styles.card}>
       <View style={styles.topRow}>
         <View style={styles.iconFrame}>
-          <MaterialIcons name="accessibility-new" size={23} color={palette.primary} />
+          <MaterialIcons
+            name={session.room_mode ? 'camera-indoor' : 'accessibility-new'}
+            size={23}
+            color={palette.primary}
+          />
         </View>
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>{VIEW_LABELS[session.view_mode]}</Text>
+          <Text style={styles.title}>
+            {CAPTURE_MODE_LABELS[session.view_mode]} · {COVERAGE_LABELS[session.coverage_mode]}
+          </Text>
           <Text style={styles.date}>{formatDate(session.started_at)}</Text>
         </View>
         <Text style={[styles.rate, { color: rateColor }]}>{Math.round(session.good_posture_rate)}%</Text>
@@ -33,7 +39,7 @@ export function SessionHistoryCard({ session }: { session: SessionSummary }) {
       </View>
       <View style={styles.metrics}>
         <Text style={styles.metric}>有效 {formatDuration(session.valid_seconds)}</Text>
-        <Text style={styles.metric}>提醒 {session.posture_event_count} 次</Text>
+        <Text style={styles.metric}>提醒 {session.reminder_count} 次</Text>
         <Text style={styles.metric}>均分 {Math.round(session.average_score)}</Text>
       </View>
       {session.insight_text ? <Text style={styles.insight}>{session.insight_text}</Text> : null}

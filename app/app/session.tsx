@@ -35,7 +35,13 @@ import {
   submitSessionFeedback,
 } from '@/lib/api';
 import { createDemoAnalysis } from '@/lib/demo';
-import { formatDuration, STAGE_LABELS, VIEW_LABELS } from '@/lib/format';
+import {
+  CAPTURE_MODE_LABELS,
+  COVERAGE_LABELS,
+  formatDuration,
+  STAGE_LABELS,
+  VIEW_LABELS,
+} from '@/lib/format';
 import {
   advanceEventWindow,
   EMPTY_EVENT_WINDOW,
@@ -46,7 +52,9 @@ import {
 import { useWideLayout } from '@/hooks/use-wide-layout';
 import type {
   AnalysisResponse,
+  CoverageMode,
   InterventionStage,
+  RequestedViewMode,
   ReminderFit,
   SessionCompleteResponse,
   SessionSummary,
@@ -84,9 +92,11 @@ export default function SessionRoute() {
 function SessionScreen() {
   const { palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
-  const params = useLocalSearchParams<{ mode?: string; demo?: string }>();
-  const viewMode: ViewMode = params.mode === 'front' ? 'front' : 'side';
+  const params = useLocalSearchParams<{ mode?: string; demo?: string; room?: string }>();
+  const requestedViewMode: RequestedViewMode =
+    params.mode === 'auto' || params.mode === 'front' ? params.mode : 'side';
   const demo = params.demo === '1';
+  const roomMode = params.room === '1';
   const isWide = useWideLayout(900);
   const {
     account,
@@ -96,7 +106,7 @@ function SessionScreen() {
   } = useAppContext();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
-  const [facing, setFacing] = useState<CameraType>('front');
+  const [facing, setFacing] = useState<CameraType>(roomMode ? 'back' : 'front');
   const [cameraReady, setCameraReady] = useState(false);
   const [phase, setPhase] = useState<Phase>('setup');
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
@@ -114,6 +124,7 @@ function SessionScreen() {
   const calibrationStartedRef = useRef(0);
   const calibrationFramesRef = useRef<AnalysisResponse[]>([]);
   const calibrationTotalRef = useRef(0);
+  const calibratedCoverageRef = useRef<CoverageMode>('upper_body');
   const activeStartedRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
   const eventWindowRef = useRef<PostureEventWindow>(EMPTY_EVENT_WINDOW);
@@ -124,10 +135,13 @@ function SessionScreen() {
   const lastSampleRef = useRef(0);
   const validSecondsRef = useRef(0);
   const goodSecondsRef = useRef(0);
+  const attentionSecondsRef = useRef(0);
+  const poorSecondsRef = useRef(0);
   const invalidSecondsRef = useRef(0);
   const scoreTotalRef = useRef(0);
   const scoreCountRef = useRef(0);
   const eventCountRef = useRef(0);
+  const reminderCountRef = useRef(0);
   const issueCountsRef = useRef<Record<string, number>>({});
   const sessionStartedIsoRef = useRef(new Date().toISOString());
 
@@ -136,6 +150,7 @@ function SessionScreen() {
     transitionRef.current = false;
     calibrationFramesRef.current = [];
     calibrationTotalRef.current = 0;
+    calibratedCoverageRef.current = 'upper_body';
     sessionIdRef.current = null;
     eventWindowRef.current = EMPTY_EVENT_WINDOW;
     deviationFramesRef.current = [];
@@ -145,10 +160,13 @@ function SessionScreen() {
     lastSampleRef.current = 0;
     validSecondsRef.current = 0;
     goodSecondsRef.current = 0;
+    attentionSecondsRef.current = 0;
+    poorSecondsRef.current = 0;
     invalidSecondsRef.current = 0;
     scoreTotalRef.current = 0;
     scoreCountRef.current = 0;
     eventCountRef.current = 0;
+    reminderCountRef.current = 0;
     issueCountsRef.current = {};
     sessionStartedIsoRef.current = new Date().toISOString();
     setAnalysis(null);
@@ -190,11 +208,17 @@ function SessionScreen() {
         phase === 'calibrating'
           ? (now - calibrationStartedRef.current) / 1000
           : (now - activeStartedRef.current) / 1000;
-      if (demo) return createDemoAnalysis(viewMode, phaseElapsed, phase === 'active' ? baseline || undefined : undefined);
+      if (demo) {
+        return createDemoAnalysis(
+          requestedViewMode,
+          phaseElapsed,
+          phase === 'active' ? baseline || undefined : undefined,
+        );
+      }
       const camera = cameraRef.current;
       if (!camera) throw new Error('相機尚未就緒。');
       const photo = await camera.takePictureAsync({
-        quality: 0.35,
+        quality: roomMode ? 0.62 : 0.35,
         base64: Platform.OS === 'web',
         skipProcessing: false,
         shutterSound: false,
@@ -204,7 +228,11 @@ function SessionScreen() {
         Platform.OS === 'web' && photo.base64
           ? `data:image/jpeg;base64,${photo.base64}`
           : photo.uri;
-      return analyzePosture(uri, viewMode, phase === 'active' ? baseline || undefined : undefined);
+      return analyzePosture(
+        uri,
+        requestedViewMode,
+        phase === 'active' ? baseline || undefined : undefined,
+      );
     }
 
     async function triggerReminder() {
@@ -217,16 +245,43 @@ function SessionScreen() {
     }
 
     async function transitionToActive() {
-      const validFrames = calibrationFramesRef.current;
+      const viewCounts = calibrationFramesRef.current.reduce<Record<ViewMode, number>>(
+        (counts, frame) => {
+          if (frame.view_mode) counts[frame.view_mode] += 1;
+          return counts;
+        },
+        { side: 0, front: 0 },
+      );
+      const resolvedView: ViewMode =
+        viewCounts.front > viewCounts.side ? 'front' : 'side';
+      const validFrames = calibrationFramesRef.current.filter(
+        (frame) => frame.view_mode === resolvedView,
+      );
       const validRatio = validFrames.length / Math.max(1, calibrationTotalRef.current);
       if (validFrames.length < 5 || validRatio < 0.8) {
         setMessage(
-          `有效影格只有 ${Math.round(validRatio * 100)}%，請讓耳朵、肩膀與髖部完整入鏡後重新校準。`,
+          `有效影格只有 ${Math.round(validRatio * 100)}%，請依取景品質提示調整後重新校準。`,
         );
         setPhase('setup');
         return;
       }
-      const metricKeys = Object.keys(validFrames[0].metrics);
+      const metricKeys = Object.keys(validFrames[0].metrics).filter((key) =>
+        validFrames.every((frame) => Number.isFinite(frame.metrics[key])),
+      );
+      if (!metricKeys.length) {
+        setMessage('校準期間沒有穩定可用的姿勢指標，請保持同一方向後重新校準。');
+        setPhase('setup');
+        return;
+      }
+      const fullBodyFrames = validFrames.filter((frame) => frame.coverage_mode === 'full_body').length;
+      const fullBodyMetricKeys =
+        resolvedView === 'side' ? ['knee_flexion'] : ['hip_tilt', 'knee_tilt'];
+      const nextCoverage: CoverageMode =
+        fullBodyFrames / validFrames.length >= 0.8 &&
+        fullBodyMetricKeys.some((key) => metricKeys.includes(key))
+          ? 'full_body'
+          : 'upper_body';
+      calibratedCoverageRef.current = nextCoverage;
       const nextBaseline = Object.fromEntries(
         metricKeys.map((key) => [key, +median(validFrames.map((frame) => frame.metrics[key])).toFixed(2)]),
       );
@@ -234,7 +289,9 @@ function SessionScreen() {
       if (!demo) {
         try {
           const created = await createSession({
-            view_mode: viewMode,
+            view_mode: requestedViewMode,
+            coverage_mode: nextCoverage,
+            room_mode: roomMode,
             intervention_stage: interventionStage,
             baseline: nextBaseline,
           });
@@ -270,7 +327,9 @@ function SessionScreen() {
 
         if (phase === 'calibrating') {
           calibrationTotalRef.current += 1;
-          if (result.valid) calibrationFramesRef.current.push(result);
+          if (result.valid && result.view_mode) {
+            calibrationFramesRef.current.push(result);
+          }
           const seconds = (now - calibrationStartedRef.current) / 1000;
           setElapsedSeconds(seconds);
           setProgress(Math.min(1, seconds / CALIBRATION_SECONDS));
@@ -285,8 +344,13 @@ function SessionScreen() {
         setElapsedSeconds(activeElapsed);
         const sampleDuration = Math.max(0.2, Math.min(2, (now - lastSampleRef.current) / 1000));
         lastSampleRef.current = now;
+        let reminderTriggered = false;
+        const comparableFrame =
+          result.valid &&
+          result.status !== 'calibrating' &&
+          Object.keys(result.deviations).length > 0;
 
-        if (!result.valid) {
+        if (!comparableFrame) {
           invalidSecondsRef.current += sampleDuration;
           invalidSinceRef.current ??= now;
           const nextEvent = advanceEventWindow(eventWindowRef.current, {
@@ -296,7 +360,11 @@ function SessionScreen() {
           }, { attentionSeconds: ATTENTION_SECONDS, recoverySeconds: RECOVERY_SECONDS });
           eventWindowRef.current = nextEvent.state;
           if (now - invalidSinceRef.current >= 5000) {
-            setMessage('已連續 5 秒看不到必要節點，請調整相機或坐回畫面中央。');
+            setMessage(
+              result.quality_issues.includes('missing_baseline')
+                ? '目前方向尚未建立個人基線，請回到校準方向。'
+                : '已連續 5 秒看不到必要節點，請調整相機或坐回畫面中央。',
+            );
           }
         } else {
           invalidSinceRef.current = null;
@@ -321,6 +389,8 @@ function SessionScreen() {
             if (nextEvent.activated) {
               eventActiveRef.current = true;
               eventCountRef.current += 1;
+              reminderCountRef.current += 1;
+              reminderTriggered = true;
               lastReminderRef.current = now;
               setEventActive(true);
               await triggerReminder();
@@ -333,11 +403,15 @@ function SessionScreen() {
             }
           }
 
-          if (!eventActiveRef.current) goodSecondsRef.current += sampleDuration;
+          if (eventActiveRef.current) poorSecondsRef.current += sampleDuration;
+          else if (thresholdExceeded) attentionSecondsRef.current += sampleDuration;
+          else goodSecondsRef.current += sampleDuration;
           if (
             eventActiveRef.current &&
             now - lastReminderRef.current >= COOLDOWNS[interventionStage] * 1000
           ) {
+            reminderCountRef.current += 1;
+            reminderTriggered = true;
             lastReminderRef.current = now;
             await triggerReminder();
           }
@@ -346,14 +420,20 @@ function SessionScreen() {
         const sessionId = sessionIdRef.current;
         if (!demo && sessionId && cloudStorageAvailable) {
           try {
+            const calibratedMetrics = new Set(Object.keys(baseline || {}));
             await addSessionSample(sessionId, {
               duration_seconds: sampleDuration,
-              is_valid: result.valid,
+              is_valid: comparableFrame,
               threshold_exceeded: result.status === 'attention',
               event_active: eventActiveRef.current,
+              reminder_triggered: reminderTriggered,
               posture_score: result.posture_score,
-              metrics: result.metrics,
-              deviations: result.deviations,
+              metrics: Object.fromEntries(
+                Object.entries(result.metrics).filter(([key]) => calibratedMetrics.has(key)),
+              ),
+              deviations: Object.fromEntries(
+                Object.entries(result.deviations).filter(([key]) => calibratedMetrics.has(key)),
+              ),
               reasons: result.reasons,
             });
           } catch {
@@ -382,7 +462,8 @@ function SessionScreen() {
     interventionStage,
     phase,
     account,
-    viewMode,
+    requestedViewMode,
+    roomMode,
   ]);
 
   function localSummary(): SessionCompleteResponse {
@@ -391,14 +472,19 @@ function SessionScreen() {
     const goodRate = valid ? (goodSecondsRef.current / valid) * 100 : 0;
     const summary: SessionSummary = {
       id: `local-${Date.now()}`,
-      view_mode: viewMode,
+      view_mode: requestedViewMode,
+      coverage_mode: calibratedCoverageRef.current,
+      room_mode: roomMode,
       intervention_stage: interventionStage,
       started_at: sessionStartedIsoRef.current,
       ended_at: new Date().toISOString(),
       valid_seconds: valid,
       good_seconds: goodSecondsRef.current,
+      attention_seconds: attentionSecondsRef.current,
+      poor_seconds: poorSecondsRef.current,
       invalid_seconds: invalidSecondsRef.current,
       posture_event_count: eventCountRef.current,
+      reminder_count: reminderCountRef.current,
       average_score: scoreCountRef.current ? scoreTotalRef.current / scoreCountRef.current : 0,
       good_posture_rate: goodRate,
       primary_issue: primaryIssue,
@@ -458,12 +544,19 @@ function SessionScreen() {
   }
 
   const cameraVisible = phase !== 'summary' && phase !== 'finishing';
-  const statusTone = analysis?.status === 'attention' ? 'warning' : analysis?.valid ? 'success' : 'neutral';
+  const statusTone =
+    analysis?.status === 'attention' || (phase === 'active' && analysis?.status === 'calibrating')
+      ? 'warning'
+      : analysis?.valid
+        ? 'success'
+        : 'neutral';
   const statusLabel =
     phase === 'calibrating'
       ? `校準中 ${Math.min(CALIBRATION_SECONDS, Math.floor(elapsedSeconds))}/${CALIBRATION_SECONDS} 秒`
       : eventActive
         ? '提醒已觸發'
+        : phase === 'active' && analysis?.status === 'calibrating'
+          ? '目前方向尚未校準'
         : analysis?.status === 'attention'
           ? `持續偏移，再 ${reminderCountdown ?? ATTENTION_SECONDS} 秒提醒`
           : analysis?.valid
@@ -486,7 +579,12 @@ function SessionScreen() {
         </Pressable>
         <View style={styles.topTitle}>
           <Text style={styles.topEyebrow}>{demo ? '展示模式' : '即時骨架分析'}</Text>
-          <Text style={styles.topHeading}>{VIEW_LABELS[viewMode]}</Text>
+          <Text style={styles.topHeading}>
+            {CAPTURE_MODE_LABELS[requestedViewMode]}
+            {requestedViewMode === 'auto' && analysis?.view_mode
+              ? ` · ${VIEW_LABELS[analysis.view_mode]}`
+              : ''}
+          </Text>
         </View>
         {phase === 'active' ? (
           <AppButton label="結束" variant="ghost" onPress={() => void finish()} />
@@ -550,6 +648,17 @@ function SessionScreen() {
                   <StatusPill label={statusLabel} tone={eventActive ? 'warning' : statusTone} />
                 </View>
               ) : null}
+              {eventActive ? (
+                <View style={styles.reminderOverlay} accessibilityLiveRegion="assertive">
+                  <MaterialIcons name="notifications-active" size={24} color={palette.onDarkAccent} />
+                  <View style={styles.reminderOverlayCopy}>
+                    <Text style={styles.reminderOverlayTitle}>慢慢回到舒服姿勢</Text>
+                    <Text style={styles.reminderOverlayText}>
+                      {analysis?.reasons[0] || '姿勢偏移已持續超過 8 秒'}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
               {phase !== 'setup' && phase !== 'finishing' ? (
                 <View style={styles.aiLiveBadge}>
                   <View style={styles.aiLiveDot} />
@@ -583,8 +692,9 @@ function SessionScreen() {
           <View style={[styles.panelColumn, isWide && styles.panelColumnWide]}>
             {phase === 'setup' ? (
               <SetupPanel
-                viewMode={viewMode}
+                viewMode={requestedViewMode}
                 demo={demo}
+                roomMode={roomMode}
                 message={message}
                 onStart={() => void startCalibration()}
               />
@@ -609,18 +719,26 @@ function SessionScreen() {
 function SetupPanel({
   viewMode,
   demo,
+  roomMode,
   message,
   onStart,
 }: {
-  viewMode: ViewMode;
+  viewMode: RequestedViewMode;
   demo: boolean;
+  roomMode: boolean;
   message: string | null;
   onStart: () => void;
 }) {
   const { palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const points =
-    viewMode === 'side'
+    viewMode === 'auto'
+      ? [
+          '把鏡頭固定在能拍到主要活動區的位置；系統會辨識正面或側面。',
+          '拍到頭、肩與髖時做半身分析；膝與腳踝也清楚時自動加入全身指標。',
+          roomMode ? '房間模式預設使用背鏡頭；畫面多人或距離過遠時不會硬做判定。' : '保持主要使用者位於畫面中央。',
+        ]
+      : viewMode === 'side'
       ? ['相機放在肩膀高度，拍到同側耳朵、肩膀與髖部。', '身體與鏡頭呈側面，避免桌面遮住髖部。']
       : ['相機正對身體中央，左右耳朵、肩膀與髖部都要入鏡。', '保持鏡頭水平，避免把相機傾斜當成肩線傾斜。'];
   return (
@@ -628,9 +746,11 @@ function SetupPanel({
       <View style={styles.panelIcon}>
         <MaterialIcons name="center-focus-strong" size={28} color={palette.primary} />
       </View>
-      <Text style={styles.panelEyebrow}>開始前 30 秒</Text>
-      <Text style={styles.panelTitle}>先把畫面設定好</Text>
-      <Text style={styles.panelLead}>接著會用 10 秒建立你的個人基線。基線是舒服、可維持的坐姿，不是刻意挺直。</Text>
+      <Text style={styles.panelEyebrow}>{roomMode ? '房間固定鏡頭' : '開始前 30 秒'}</Text>
+      <Text style={styles.panelTitle}>{viewMode === 'auto' ? '先確認活動範圍' : '先把畫面設定好'}</Text>
+      <Text style={styles.panelLead}>
+        接著會用 10 秒建立你的個人基線。自適應模式只鎖定校準期間穩定可見的方向與指標，不會用缺少的節點猜測。
+      </Text>
       <View style={styles.checkList}>
         {points.map((point) => (
           <View key={point} style={styles.checkRow}>
@@ -658,7 +778,7 @@ function SetupPanel({
         </View>
       ) : null}
       <AppButton
-        label={demo ? '開始 10 秒展示校準' : '開始 10 秒校準'}
+        label={demo ? '開始 10 秒展示校準' : viewMode === 'auto' ? '檢查取景並開始校準' : '開始 10 秒校準'}
         icon="play-arrow"
         fullWidth
         onPress={onStart}
@@ -690,12 +810,29 @@ function LivePanel({
   const metrics = Object.entries(analysis?.deviations || {});
   return (
     <View style={styles.liveStack}>
-      <Surface tone={eventActive ? 'danger' : analysis?.status === 'attention' ? 'amber' : 'ai'} style={styles.scoreCard}>
-        <ScoreGauge value={analysis?.posture_score ?? null} size={126} />
+      <Surface
+        tone={
+          eventActive
+            ? 'danger'
+            : analysis?.status === 'attention' || (phase === 'active' && analysis?.status === 'calibrating')
+              ? 'amber'
+              : 'ai'
+        }
+        style={styles.scoreCard}>
+        <ScoreGauge
+          value={phase === 'active' && analysis?.status === 'calibrating' ? null : analysis?.posture_score ?? null}
+          size={126}
+        />
         <View style={styles.scoreCopy}>
           <Text style={styles.panelEyebrow}>{phase === 'calibrating' ? '建立個人基線' : STAGE_LABELS[interventionStage]}</Text>
           <Text style={styles.scoreTitle}>
-            {eventActive ? '慢慢回到舒服坐姿' : analysis?.status === 'attention' ? '角度正在偏移' : '保持自然呼吸'}
+            {eventActive
+              ? '慢慢回到舒服坐姿'
+              : phase === 'active' && analysis?.status === 'calibrating'
+                ? '這個方向尚未校準'
+                : analysis?.status === 'attention'
+                  ? '角度正在偏移'
+                  : '保持自然呼吸'}
           </Text>
           <Text style={styles.scoreText}>{analysis?.message || '正在等待下一個有效影格。'}</Text>
         </View>
@@ -731,8 +868,36 @@ function LivePanel({
           label={analysis?.valid ? `骨架品質 ${Math.round(analysis.quality * 100)}%` : '骨架節點不足'}
           tone={analysis?.valid ? 'success' : 'warning'}
         />
+        {analysis?.coverage_mode ? (
+          <StatusPill label={COVERAGE_LABELS[analysis.coverage_mode]} tone="info" />
+        ) : null}
+        <StatusPill
+          label={
+            analysis?.distance === 'recommended'
+              ? '距離合適'
+              : analysis?.distance === 'far'
+                ? '距離過遠'
+                : analysis?.distance === 'near'
+                  ? '距離過近'
+                  : '等待距離判定'
+          }
+          tone={analysis?.distance === 'recommended' ? 'success' : 'warning'}
+        />
+        {analysis && analysis.pose_count > 1 ? (
+          <StatusPill label={`畫面有 ${analysis.pose_count} 人`} tone="warning" />
+        ) : null}
         <StatusPill label={storageAvailable ? '衍生資料已連線' : '離線摘要'} tone={storageAvailable ? 'success' : 'neutral'} />
       </View>
+      {analysis?.quality_issues.length ? (
+        <View style={styles.qualityList}>
+          {analysis.quality_issues.slice(0, 3).map((issue) => (
+            <View key={issue} style={styles.qualityRow}>
+              <MaterialIcons name="center-focus-weak" size={18} color={palette.warning} />
+              <Text style={styles.qualityText}>{qualityIssueLabel(issue)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
       {message ? (
         <View style={styles.errorBox}>
           <MaterialIcons name="error-outline" size={20} color={palette.warning} />
@@ -750,8 +915,27 @@ function metricLabel(key: string): string {
     head_tilt: '頭部側傾',
     shoulder_tilt: '肩線傾斜',
     trunk_lateral: '軀幹側傾',
+    knee_flexion: '膝部彎曲',
+    hip_tilt: '骨盆線傾斜',
+    knee_tilt: '膝線傾斜',
   };
   return labels[key] || key;
+}
+
+function qualityIssueLabel(issue: string): string {
+  const labels: Record<string, string> = {
+    no_pose: '畫面中找不到人體，請回到鏡頭支援區。',
+    unsupported_view: '目前角度介於正面與側面，請轉成較明確的方向。',
+    multiple_people: '畫面中有多人，請只保留一位主要使用者。',
+    too_far: '距離太遠，請靠近鏡頭或調整鏡頭位置。',
+    partial_framing: '身體貼近畫面邊緣，請回到畫面中央。',
+    out_of_frame: '身體超出取景範圍，請調整鏡頭或位置。',
+    poor_visibility: '必要節點信心不足，請改善光線並避免遮擋。',
+    no_supported_metrics: '看不到足夠身體節點，暫時不做姿勢判定。',
+    no_upper_body_metrics: '只看到下半身，請讓頭部或軀幹回到畫面內。',
+    missing_baseline: '目前方向沒有可用的個人基線，請回到校準方向。',
+  };
+  return labels[issue] || issue;
 }
 
 function SummaryView({
@@ -793,11 +977,11 @@ function SummaryView({
           <StatusPill label="工作階段已完成" tone="success" />
           <Text style={styles.summaryHeading}>更快察覺變化，就是這次的進步。</Text>
           <ScoreGauge value={summary.good_posture_rate} size={160} label="良好坐姿率" unit="%" />
-          <Text style={styles.summaryCaption}>有效時間內，未處於持續姿勢事件的比例</Text>
+          <Text style={styles.summaryCaption}>有效時間內，所有可用指標都在個人門檻內的比例</Text>
         </Surface>
         <View style={styles.summaryMetrics}>
           <SummaryMetric label="有效觀察" value={formatDuration(summary.valid_seconds)} icon="schedule" />
-          <SummaryMetric label="提醒事件" value={`${summary.posture_event_count} 次`} icon="notifications-active" />
+          <SummaryMetric label="提醒次數" value={`${summary.reminder_count} 次`} icon="notifications-active" />
           <SummaryMetric label="平均分數" value={`${Math.round(summary.average_score)} 分`} icon="insights" />
         </View>
         <Surface tone="dark" style={styles.summaryInsight}>
@@ -937,6 +1121,24 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   cornerBottomLeft: { left: 0, bottom: 0, borderLeftWidth: 3, borderBottomWidth: 3 },
   cornerBottomRight: { right: 0, bottom: 0, borderRightWidth: 3, borderBottomWidth: 3 },
   previewStatus: { position: 'absolute', left: 16, bottom: 16 },
+  reminderOverlay: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 58,
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: palette.overlay,
+    borderWidth: 2,
+    borderColor: palette.warning,
+  },
+  reminderOverlayCopy: { flex: 1, gap: 3 },
+  reminderOverlayTitle: { color: palette.white, fontFamily: Typography.displayFamily, fontSize: Typography.h3, fontWeight: '700' },
+  reminderOverlayText: { color: palette.onDarkAccent, fontFamily: Typography.family, fontSize: Typography.caption, lineHeight: 18 },
   aiLiveBadge: { position: 'absolute', left: 16, top: 16, minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: palette.overlay, borderRadius: Radius.pill, borderWidth: 1, borderColor: palette.lineBright, paddingHorizontal: Spacing.sm },
   aiLiveDot: { width: 7, height: 7, borderRadius: 0, backgroundColor: palette.onDarkAccent },
   aiLiveText: { color: palette.onDarkAccent, fontFamily: 'monospace', fontSize: 10, fontWeight: '800', letterSpacing: 0.7 },
@@ -975,6 +1177,9 @@ const createStyles = (palette: ThemePalette) => StyleSheet.create({
   angleThreshold: { width: 86, fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.caption, textAlign: 'right' },
   waitingText: { fontFamily: Typography.family, color: palette.inkSoft, fontSize: Typography.small, lineHeight: 21, paddingVertical: Spacing.md },
   diagnosticRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  qualityList: { gap: Spacing.xs },
+  qualityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs },
+  qualityText: { flex: 1, fontFamily: Typography.family, color: palette.warningText, fontSize: Typography.caption, lineHeight: 18 },
   summaryPage: { width: '100%', maxWidth: 900, alignSelf: 'center', padding: Spacing.md, paddingBottom: Spacing.xxl, gap: Spacing.lg },
   summaryBrand: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, minHeight: 58 },
   summaryBrandText: { fontFamily: Typography.displayFamily, color: palette.ink, fontSize: Typography.h3, fontWeight: '700' },

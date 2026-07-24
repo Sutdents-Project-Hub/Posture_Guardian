@@ -16,7 +16,9 @@ config.set_main_option(
     settings.normalized_database_url.replace("%", "%%"),
 )
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Migrations run inside Uvicorn's lifespan; keep the host application's
+    # loggers alive so startup failures remain visible and diagnosable.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

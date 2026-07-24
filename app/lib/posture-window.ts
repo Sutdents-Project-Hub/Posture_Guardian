@@ -6,6 +6,9 @@ const METRIC_LABELS: Record<string, string> = {
   head_tilt: '頭部側傾角度偏移',
   shoulder_tilt: '左右肩線傾斜',
   trunk_lateral: '軀幹側傾角度偏移',
+  knee_flexion: '膝部角度偏移',
+  hip_tilt: '髖線傾斜',
+  knee_tilt: '膝線傾斜',
 };
 
 export type DeviationFrame = {

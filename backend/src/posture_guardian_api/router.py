@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Annotated
 from uuid import uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import (
     APIRouter,
@@ -38,17 +39,25 @@ from posture_guardian_api.posture import (
     PoseAnalyzer,
     PoseInputError,
     PoseModelUnavailable,
+    assess_frame,
+    detect_coverage,
     evaluate_metrics,
     parse_baseline,
+    resolve_view_mode,
+    supported_metrics,
 )
 from posture_guardian_api.schemas import (
     AnalysisResponse,
     AuthCredentials,
     AuthSessionResponse,
     AuthUser,
+    CoverageMode,
     DeleteResponse,
+    DistanceBand,
     FeedbackAccepted,
+    FramingStatus,
     HealthResponse,
+    RequestedViewMode,
     SampleAccepted,
     SampleCreate,
     SessionCompleteResponse,
@@ -57,8 +66,14 @@ from posture_guardian_api.schemas import (
     SessionFeedbackCreate,
     SessionList,
     ViewMode,
+    WeeklyReport,
 )
-from posture_guardian_api.sessions import complete_session, delete_user_data, to_summary
+from posture_guardian_api.sessions import (
+    build_weekly_report,
+    complete_session,
+    delete_user_data,
+    to_summary,
+)
 
 router = APIRouter()
 settings = get_settings()
@@ -172,7 +187,7 @@ async def logout_account(current: CurrentAuth, db: DatabaseDep) -> Response:
 )
 async def analyze_posture(
     image: Annotated[UploadFile, File(description="Transient camera frame")],
-    view_mode: Annotated[ViewMode, Form()],
+    view_mode: Annotated[RequestedViewMode, Form()],
     baseline: Annotated[str | None, Form()] = None,
 ) -> AnalysisResponse:
     """Analyze one camera frame without persisting its bytes."""
@@ -186,27 +201,77 @@ async def analyze_posture(
 
     try:
         parsed_baseline = parse_baseline(baseline)
-        if parsed_baseline is not None and set(parsed_baseline) != set(THRESHOLDS[view_mode]):
-            raise PoseInputError("baseline 欄位與所選視角不一致。")
-        landmarks = await run_in_threadpool(pose_analyzer.detect, image_bytes)
-        if not landmarks:
+        allowed_baseline = set().union(*(set(values) for values in THRESHOLDS.values()))
+        if parsed_baseline is not None and not set(parsed_baseline).issubset(allowed_baseline):
+            raise PoseInputError("baseline 包含不支援的姿勢指標。")
+        detection = await run_in_threadpool(pose_analyzer.detect, image_bytes)
+        if not detection.landmarks:
+            fixed_view = (
+                ViewMode(view_mode.value) if view_mode is not RequestedViewMode.AUTO else None
+            )
             return AnalysisResponse(
-                view_mode=view_mode,
+                view_mode=fixed_view,
+                requested_view_mode=view_mode,
+                coverage_mode=CoverageMode.UPPER_BODY,
                 valid=False,
                 quality=0,
                 status="invalid",
                 posture_score=0,
                 metrics={},
                 deviations={},
-                thresholds=THRESHOLDS[view_mode],
+                thresholds={},
                 reasons=[],
                 landmarks=[],
+                image_width=detection.image_width,
+                image_height=detection.image_height,
+                pose_count=0,
+                subject_scale=0,
+                distance=DistanceBand.UNKNOWN,
+                framing=FramingStatus.OUT_OF_FRAME,
+                quality_issues=["no_pose"],
                 message="畫面中找不到完整坐姿，請調整距離與光線。",
             )
+        resolved_view = resolve_view_mode(
+            detection.landmarks,
+            view_mode,
+            detection.world_landmarks,
+            detection.image_width,
+            detection.image_height,
+        )
+        if resolved_view is None:
+            subject_scale, distance, framing, issues = assess_frame(detection.landmarks)
+            return AnalysisResponse(
+                view_mode=None,
+                requested_view_mode=view_mode,
+                coverage_mode=CoverageMode.UPPER_BODY,
+                valid=False,
+                quality=0,
+                status="invalid",
+                posture_score=0,
+                metrics={},
+                deviations={},
+                thresholds={},
+                reasons=[],
+                landmarks=detection.landmarks,
+                image_width=detection.image_width,
+                image_height=detection.image_height,
+                pose_count=detection.pose_count,
+                subject_scale=subject_scale,
+                distance=distance,
+                framing=framing,
+                quality_issues=[*issues, "unsupported_view"],
+                message="目前角度介於正面與側面，請稍微轉向鏡頭或轉成側面。",
+            )
+        coverage = detect_coverage(detection.landmarks, resolved_view)
         return evaluate_metrics(
-            landmarks=landmarks,
-            view_mode=view_mode,
+            landmarks=detection.landmarks,
+            view_mode=resolved_view,
             baseline=parsed_baseline,
+            requested_view_mode=view_mode,
+            coverage_mode=coverage,
+            image_width=detection.image_width,
+            image_height=detection.image_height,
+            pose_count=detection.pose_count,
         )
     except PoseModelUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -231,6 +296,8 @@ async def create_session(
         profile_id=user.id,
         user_id=user.id,
         view_mode=payload.view_mode.value,
+        coverage_mode=payload.coverage_mode.value,
+        room_mode=payload.room_mode,
         intervention_stage=payload.intervention_stage.value,
         baseline=payload.baseline,
     )
@@ -255,7 +322,18 @@ async def add_sample(
     session = await owned_session(db, session_id, user)
     if session.ended_at is not None:
         raise HTTPException(status_code=409, detail="工作階段已結束。")
-    expected_metrics = set(THRESHOLDS[ViewMode(session.view_mode)])
+    if session.view_mode == RequestedViewMode.AUTO.value:
+        expected_metrics = set().union(
+            *(
+                supported_metrics(view, CoverageMode(session.coverage_mode))
+                for view in ViewMode
+            )
+        )
+    else:
+        expected_metrics = supported_metrics(
+            ViewMode(session.view_mode),
+            CoverageMode(session.coverage_mode),
+        )
     if not set(payload.metrics).issubset(expected_metrics):
         raise HTTPException(status_code=422, detail="metrics 欄位與工作階段視角不一致。")
     if not set(payload.deviations).issubset(expected_metrics):
@@ -269,6 +347,7 @@ async def add_sample(
             is_valid=payload.is_valid,
             threshold_exceeded=payload.threshold_exceeded,
             event_active=payload.event_active,
+            reminder_triggered=payload.reminder_triggered,
             posture_score=payload.posture_score,
             metrics=payload.metrics,
             deviations=payload.deviations,
@@ -339,6 +418,30 @@ async def list_sessions(
         ).all()
     )
     return SessionList(items=[to_summary(row) for row in rows])
+
+
+@router.get(
+    "/api/v1/reports/weekly",
+    response_model=WeeklyReport,
+    tags=["reports"],
+)
+async def weekly_report(
+    db: DatabaseDep,
+    user: CurrentUser,
+    timezone: str = "Asia/Taipei",
+) -> WeeklyReport:
+    """Return the current local week's derived posture distribution and guidance."""
+    if len(timezone) > 64:
+        raise HTTPException(status_code=422, detail="timezone 長度不正確。")
+    try:
+        ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise HTTPException(status_code=422, detail="timezone 必須是有效的 IANA 時區。") from None
+    return await build_weekly_report(
+        db,
+        user_id=user.id,
+        timezone_name=timezone,
+    )
 
 
 @router.delete(

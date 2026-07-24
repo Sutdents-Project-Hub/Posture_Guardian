@@ -8,8 +8,9 @@
   2. `posture-guardian-api`：private GitHub repository 的 `/backend` Dockerfile Application。
   3. `posture-guardian-web`：同一 repository 的 `/app` Dockerfile Application。
 - `app/Dockerfile` 與 `backend/Dockerfile` 是正式部署 image 的唯一建置來源；兩者已固定基底 image／依賴，且分別提供 `/` 與 `/health` Docker health check。
+- 先前的 Linux ARM64／Compose 證據驗證的是既有垂直切片；改用 Full model 與 `20260724_01` migration 後，必須重新執行 API image build、模型 checksum、migration、restart persistence、週報與 Web smoke test，才可稱為本候選版容器已驗證。
 - `compose.coolify.yaml` 保留為三容器拓撲、migration、持久化與備份還原的本機整合驗證規格，**不作為 Coolify production Resource**；它不能取代下列各 Resource 的獨立網域、runtime secret、資料庫備份與回滾設定。
-- API 啟動前會執行 `alembic upgrade head`；migration 失敗時不開始服務。量界智算正式 endpoint、model ID、key 與 API mode 仍待帳號文件確認。
+- API 啟動前會執行 `alembic upgrade head`；migration 失敗時不開始服務。API image 固定下載 MediaPipe Pose Landmarker Full，正式 VPS 的模型載入時間、記憶體、每秒約 2 幀與房間模式延遲仍須實測。量界智算正式 endpoint、model ID、key 與 API mode 仍待帳號文件確認。
 
 ## 命名與網路契約
 
@@ -84,7 +85,7 @@ AUTH_SESSION_DAYS=14
 - `DB_HOST` 必須使用 Coolify database Resource 的 internal host，不能使用 public IP 或 localhost。
 - `CORS_ORIGINS` 只接受完整 HTTPS Web origin；不要填 `*`、path、尾斜線或 API domain。
 - 使用量界智算時，再額外設定 `AI_PROVIDER=liangjie`、`AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL`，並依正式文件確認 `AI_API_MODE`。URL、key 或 model 任一缺失時 API 會拒絕啟動。
-- Docker image 會下載固定的 MediaPipe 模型並在啟動時跑 Alembic migration；不設定額外 pre／post migration command，避免重複執行。
+- Docker image 會下載固定的官方 MediaPipe Pose Landmarker Full `float16/1`，並以 SHA-256 `5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1` 驗證後打包；runtime 的 `POSE_MODEL_PATH` 指向 `/app/models/pose_landmarker_full.task`。啟動時另執行 Alembic migration，不設定額外 pre／post migration command，避免重複執行。
 
 ## 3. 建立 Web Dockerfile Application
 
@@ -114,7 +115,7 @@ EXPO_PUBLIC_API_BASE_URL=https://api.<your-domain>
 1. PostgreSQL 顯示 healthy，並確認 API 可讀到其內部連線資訊。
 2. 設定 API runtime variables，Deploy API；確認 Alembic migration 完成與 `/health` 回 HTTP 200。
 3. 設定 Web 的 build-only API URL，Deploy Web；確認首頁、登入、展示模式與相機權限的 HTTPS 行為。
-4. 用 Web 註冊測試帳號，完成校準、工作階段、完成摘要與歷史查詢；重啟 API 後確認資料仍存在。
+4. 用 Web 註冊測試帳號，完成房間自適應／固定視角、半身／全身校準、工作階段、完成摘要、歷史與 `GET /api/v1/reports/weekly?timezone=Asia/Taipei`；重啟 API 後確認資料與 reminder count 仍存在。
 5. 以錯誤 Origin 重測 CORS，確認不回傳 `Access-Control-Allow-Origin`；再驗證量界智算 timeout 時顯示透明 fallback。
 6. 執行一次 backup，還原至隔離 PostgreSQL Resource 後確認資料可讀回，才把正式資料視為可恢復。
 

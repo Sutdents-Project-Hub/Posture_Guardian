@@ -27,8 +27,8 @@ const PIPELINE = [
   },
   {
     icon: 'accessibility-new' as const,
-    title: 'MediaPipe 33 個節點',
-    detail: '先確認耳、肩、髖等節點品質，再計算角度。',
+    title: 'MediaPipe 33 點自適應骨架',
+    detail: '先辨識正面／側面與半身／全身，再只用可靠可見的節點計算角度。',
   },
   {
     icon: 'rule' as const,
@@ -113,6 +113,7 @@ export default function InsightsScreen() {
           </Text>
           <View style={styles.heroFacts}>
             <Fact value="33" label="姿態節點" />
+            <Fact value="AUTO" label="半身／全身" />
             <Fact value="10s" label="個人校準" />
             <Fact value="8s" label="持續偏移" />
           </View>

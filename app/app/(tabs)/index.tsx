@@ -16,9 +16,9 @@ import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/desi
 import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
 import { getHealth, getSessions } from '@/lib/api';
 import { useWideLayout } from '@/hooks/use-wide-layout';
-import { STAGE_LABELS, VIEW_LABELS } from '@/lib/format';
+import { CAPTURE_MODE_LABELS, STAGE_LABELS } from '@/lib/format';
 import { buildPostureTrend, nextCoachTask } from '@/lib/trends';
-import type { HealthResponse, SessionSummary, ViewMode } from '@/types/posture';
+import type { HealthResponse, RequestedViewMode, SessionSummary } from '@/types/posture';
 
 export default function HomeScreen() {
   const { gradients, palette } = useAppTheme();
@@ -60,12 +60,15 @@ export default function HomeScreen() {
   const trend = buildPostureTrend(sessions);
   const coachTask = nextCoachTask(trend);
 
-  function start(mode: ViewMode, demo = false) {
+  function start(mode: RequestedViewMode, demo = false, room = false) {
     if (!demo && !account) {
       router.push('/auth' as Href);
       return;
     }
-    router.push({ pathname: '/session', params: { mode, demo: demo ? '1' : '0' } });
+    router.push({
+      pathname: '/session',
+      params: { mode, demo: demo ? '1' : '0', room: room ? '1' : '0' },
+    });
   }
 
   return (
@@ -93,19 +96,20 @@ export default function HomeScreen() {
           <StatusPill label={STAGE_LABELS[interventionStage]} tone="info" />
           <Text style={[styles.display, !isWide && styles.displayNarrow]}>AI 看見偏移，{`\n`}你看見改變。</Text>
           <Text style={styles.lead}>
-            33 個姿態節點搭配個人基線，先用可解釋規則辨識，再由 AI 把長期趨勢變成下一個小調整。
+            33 個姿態節點會依半身／全身與正面／側面選擇可靠指標，再由 AI 把長期趨勢變成下一個小調整。
           </Text>
           <View style={styles.evidenceChips}>
             <EvidenceChip icon="accessibility-new" label="33 點骨架" />
+            <EvidenceChip icon="crop-free" label="半身／全身自適應" />
             <EvidenceChip icon="timer" label="10 秒基線" />
             <EvidenceChip icon="no-photography" label="影像不儲存" />
           </View>
           <View style={[styles.heroActions, !isWide && styles.heroActionsNarrow]}>
             <AppButton
-              label="開始側面偵測"
-              icon="center-focus-strong"
+              label="開始房間自適應"
+              icon="camera-indoor"
               fullWidth={!isWide}
-              onPress={() => start('side')}
+              onPress={() => start('auto', false, true)}
             />
             <AppButton
               label="試看展示模式"
@@ -130,17 +134,25 @@ export default function HomeScreen() {
 
       <View style={styles.sectionHeading}>
         <View>
-          <Text style={styles.eyebrow}>選擇觀察視角</Text>
-          <Text style={styles.sectionTitle}>今天想觀察哪一種偏移？</Text>
+          <Text style={styles.eyebrow}>選擇觀察方式</Text>
+          <Text style={styles.sectionTitle}>讓系統依入鏡範圍選擇可用指標</Text>
         </View>
         <Text style={styles.sectionNote}>每次移動相機都要重新校準</Text>
       </View>
 
       <View style={[styles.modeGrid, isWide && styles.modeGridWide]}>
         <ModeCard
+          mode="auto"
+          title="房間自適應"
+          subtitle="建議優先使用"
+          description="固定背鏡頭後自動辨識正面／側面與半身／全身；只用當下可靠可見的節點分析。"
+          icon="camera-indoor"
+          onPress={() => start('auto', false, true)}
+        />
+        <ModeCard
           mode="side"
           title="側面視角"
-          subtitle="建議優先使用"
+          subtitle="手動固定"
           description="觀察頭頸與軀幹前傾角度，需看到同側耳、肩、髖。"
           icon="airline-seat-recline-extra"
           onPress={() => start('side')}
@@ -148,7 +160,7 @@ export default function HomeScreen() {
         <ModeCard
           mode="front"
           title="正面視角"
-          subtitle="補充觀察"
+          subtitle="手動固定"
           description="觀察頭部側傾、肩線高低與軀幹側傾，不能判定前傾。"
           icon="accessibility-new"
           onPress={() => start('front')}
@@ -227,7 +239,7 @@ function ModeCard({
   icon,
   onPress,
 }: {
-  mode: ViewMode;
+  mode: RequestedViewMode;
   title: string;
   subtitle: string;
   description: string;
@@ -239,7 +251,7 @@ function ModeCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`開始${VIEW_LABELS[mode]}偵測`}
+      accessibilityLabel={`開始${CAPTURE_MODE_LABELS[mode]}偵測`}
       accessibilityHint={description}
       onPress={onPress}
       style={({ pressed }) => [styles.modeCard, pressed && styles.pressed]}>

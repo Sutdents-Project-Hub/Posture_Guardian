@@ -1,18 +1,22 @@
 """Session aggregation, reminder-stage evaluation, and persistence helpers."""
 
 from collections import Counter
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from posture_guardian_api.config import Settings
 from posture_guardian_api.insights import InsightInput, generate_insight
-from posture_guardian_api.models import PostureSample, PostureSession, SessionFeedback
+from posture_guardian_api.models import PostureSample, PostureSession, SessionFeedback, utc_now
 from posture_guardian_api.schemas import (
     InterventionStage,
     SessionCompleteResponse,
     SessionSummary,
+    WeeklyReport,
+    WeeklyStatusDistribution,
+    WeeklyTimePeriod,
 )
 
 
@@ -21,13 +25,18 @@ def to_summary(session: PostureSession) -> SessionSummary:
     return SessionSummary(
         id=session.id,
         view_mode=session.view_mode,
+        coverage_mode=session.coverage_mode,
+        room_mode=session.room_mode,
         intervention_stage=session.intervention_stage,
         started_at=session.started_at,
         ended_at=session.ended_at,
         valid_seconds=round(session.valid_seconds, 1),
         good_seconds=round(session.good_seconds, 1),
+        attention_seconds=round(session.attention_seconds, 1),
+        poor_seconds=round(session.poor_seconds, 1),
         invalid_seconds=round(session.invalid_seconds, 1),
         posture_event_count=session.posture_event_count,
+        reminder_count=session.reminder_count,
         average_score=round(session.average_score, 1),
         good_posture_rate=round(session.good_posture_rate, 1),
         primary_issue=session.primary_issue,
@@ -99,13 +108,23 @@ async def complete_session(
                 )
             ).all()
         )
-        session.ended_at = datetime.now().astimezone()
+        session.ended_at = utc_now()
         session.valid_seconds = sum(item.duration_seconds for item in samples if item.is_valid)
         session.invalid_seconds = sum(
             item.duration_seconds for item in samples if not item.is_valid
         )
         session.good_seconds = sum(
-            item.duration_seconds for item in samples if item.is_valid and not item.event_active
+            item.duration_seconds
+            for item in samples
+            if item.is_valid and not item.threshold_exceeded and not item.event_active
+        )
+        session.attention_seconds = sum(
+            item.duration_seconds
+            for item in samples
+            if item.is_valid and item.threshold_exceeded and not item.event_active
+        )
+        session.poor_seconds = sum(
+            item.duration_seconds for item in samples if item.is_valid and item.event_active
         )
         valid_samples = [item for item in samples if item.is_valid]
         session.average_score = (
@@ -127,6 +146,7 @@ async def complete_session(
             if sample.threshold_exceeded:
                 issues.update(sample.reasons)
         session.posture_event_count = event_count
+        session.reminder_count = sum(1 for item in samples if item.reminder_triggered)
         session.primary_issue = issues.most_common(1)[0][0] if issues else None
 
         previous_rows = list(
@@ -194,6 +214,202 @@ async def complete_session(
         summary=to_summary(session),
         suggested_stage=suggested_stage,
         stage_reason=reason,
+    )
+
+
+_PERIODS = (
+    ("overnight", "凌晨 00:00–06:00"),
+    ("morning", "上午 06:00–12:00"),
+    ("afternoon", "下午 12:00–18:00"),
+    ("evening", "晚上 18:00–24:00"),
+)
+
+
+def _period_name(hour: int) -> str:
+    if hour < 6:
+        return "overnight"
+    if hour < 12:
+        return "morning"
+    if hour < 18:
+        return "afternoon"
+    return "evening"
+
+
+def _aware_utc(value: datetime) -> datetime:
+    """Normalize SQLite-naive and PostgreSQL-aware values to aware UTC."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+async def build_weekly_report(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    timezone_name: str,
+    now: datetime | None = None,
+) -> WeeklyReport:
+    """Aggregate the signed-in user's current local week from derived samples only."""
+    timezone = ZoneInfo(timezone_name)
+    local_now = (now or utc_now()).astimezone(timezone)
+    local_start = (local_now - timedelta(days=local_now.weekday())).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    local_end = local_start + timedelta(days=7)
+    start_utc = local_start.astimezone(UTC)
+    end_utc = local_end.astimezone(UTC)
+
+    sessions = list(
+        (
+            await db.scalars(
+                select(PostureSession)
+                .where(
+                    PostureSession.user_id == user_id,
+                    PostureSession.started_at < end_utc,
+                    (PostureSession.ended_at.is_(None) | (PostureSession.ended_at >= start_utc)),
+                )
+                .order_by(PostureSession.started_at)
+            )
+        ).all()
+    )
+    session_ids = [session.id for session in sessions]
+    samples: list[PostureSample] = []
+    if session_ids:
+        samples = list(
+            (
+                await db.scalars(
+                    select(PostureSample)
+                    .where(
+                        PostureSample.session_id.in_(session_ids),
+                        PostureSample.captured_at >= start_utc,
+                        PostureSample.captured_at < end_utc,
+                    )
+                    .order_by(PostureSample.captured_at, PostureSample.id)
+                )
+            ).all()
+        )
+
+    totals = {
+        name: {
+            "valid": 0.0,
+            "good": 0.0,
+            "attention": 0.0,
+            "poor": 0.0,
+            "invalid": 0.0,
+            "reminders": 0,
+        }
+        for name, _ in _PERIODS
+    }
+    issues: dict[str, float] = {}
+    weighted_score = 0.0
+    valid_seconds = 0.0
+    good_seconds = 0.0
+    attention_seconds = 0.0
+    poor_seconds = 0.0
+    invalid_seconds = 0.0
+    reminder_count = 0
+
+    for sample in samples:
+        local_captured = _aware_utc(sample.captured_at).astimezone(timezone)
+        bucket = totals[_period_name(local_captured.hour)]
+        duration = sample.duration_seconds
+        if not sample.is_valid:
+            invalid_seconds += duration
+            bucket["invalid"] += duration
+            continue
+
+        valid_seconds += duration
+        bucket["valid"] += duration
+        weighted_score += sample.posture_score * duration
+        if sample.event_active:
+            poor_seconds += duration
+            bucket["poor"] += duration
+        elif sample.threshold_exceeded:
+            attention_seconds += duration
+            bucket["attention"] += duration
+        else:
+            good_seconds += duration
+            bucket["good"] += duration
+        if sample.reminder_triggered:
+            reminder_count += 1
+            bucket["reminders"] += 1
+        if sample.threshold_exceeded:
+            for reason in sample.reasons:
+                issues[reason] = issues.get(reason, 0.0) + duration
+
+    time_periods = [
+        WeeklyTimePeriod(
+            period=name,
+            label=label,
+            valid_seconds=round(float(totals[name]["valid"]), 1),
+            good_seconds=round(float(totals[name]["good"]), 1),
+            attention_seconds=round(float(totals[name]["attention"]), 1),
+            poor_seconds=round(float(totals[name]["poor"]), 1),
+            good_posture_rate=round(
+                float(totals[name]["good"]) / float(totals[name]["valid"]) * 100,
+                1,
+            )
+            if totals[name]["valid"]
+            else 0,
+            reminder_count=int(totals[name]["reminders"]),
+        )
+        for name, label in _PERIODS
+    ]
+    primary_issue = max(issues, key=issues.__getitem__) if issues else None
+    latest = sessions[-1] if sessions else None
+    qualified_count = sum(session.valid_seconds >= 600 for session in sessions)
+    weekly_input = InsightInput(
+        view_mode=latest.view_mode if latest else "auto",
+        valid_minutes=valid_seconds / 60,
+        good_posture_rate=good_seconds / valid_seconds * 100 if valid_seconds else 0,
+        event_count=reminder_count,
+        average_score=weighted_score / valid_seconds if valid_seconds else 0,
+        primary_issue=primary_issue,
+        intervention_stage=latest.intervention_stage if latest else "starter",
+        qualified_session_count=qualified_count,
+    )
+    # A GET report must not repeatedly spend external-model quota. Reuse an already
+    # persisted provider result when available, otherwise produce the deterministic fallback.
+    if (
+        latest is not None
+        and latest.insight_text
+        and latest.insight_provider in {"liangjie", "fallback"}
+    ):
+        insight_text = latest.insight_text
+        insight_provider = latest.insight_provider
+    else:
+        from posture_guardian_api.insights import fallback_insight
+
+        insight_text = fallback_insight(weekly_input)
+        insight_provider = "fallback"
+
+    return WeeklyReport(
+        period_start=local_start,
+        period_end=local_end,
+        timezone=timezone_name,
+        session_count=len(sessions),
+        valid_seconds=round(valid_seconds, 1),
+        good_seconds=round(good_seconds, 1),
+        attention_seconds=round(attention_seconds, 1),
+        poor_seconds=round(poor_seconds, 1),
+        invalid_seconds=round(invalid_seconds, 1),
+        good_posture_rate=round(good_seconds / valid_seconds * 100, 1)
+        if valid_seconds
+        else 0,
+        reminder_count=reminder_count,
+        status_distribution=WeeklyStatusDistribution(
+            good_seconds=round(good_seconds, 1),
+            attention_seconds=round(attention_seconds, 1),
+            poor_seconds=round(poor_seconds, 1),
+            invalid_seconds=round(invalid_seconds, 1),
+        ),
+        time_periods=time_periods,
+        primary_issue=primary_issue,
+        insight_text=insight_text,
+        insight_provider=insight_provider,
     )
 
 

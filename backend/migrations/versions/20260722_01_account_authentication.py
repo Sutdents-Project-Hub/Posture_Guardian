@@ -38,8 +38,18 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_auth_sessions_user_id"), "auth_sessions", ["user_id"], unique=False)
-    op.create_index(op.f("ix_auth_sessions_token_hash"), "auth_sessions", ["token_hash"], unique=True)
-    op.create_index(op.f("ix_auth_sessions_expires_at"), "auth_sessions", ["expires_at"], unique=False)
+    op.create_index(
+        op.f("ix_auth_sessions_token_hash"),
+        "auth_sessions",
+        ["token_hash"],
+        unique=True,
+    )
+    op.create_index(
+        op.f("ix_auth_sessions_expires_at"),
+        "auth_sessions",
+        ["expires_at"],
+        unique=False,
+    )
     with op.batch_alter_table("posture_sessions") as batch:
         batch.add_column(sa.Column("user_id", sa.String(length=36), nullable=True))
         batch.create_foreign_key(

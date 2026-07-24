@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         "http://localhost:8081,http://127.0.0.1:8081,"
         "http://localhost:19006,http://127.0.0.1:19006"
     )
-    pose_model_path: Path = API_ROOT / "models/pose_landmarker_lite.task"
+    pose_model_path: Path = API_ROOT / "models/pose_landmarker_full.task"
     migration_root: Path = API_ROOT
     max_image_bytes: int = 5 * 1024 * 1024
 

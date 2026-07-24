@@ -54,7 +54,7 @@ export function PostureOverlay({
             />
           );
         })}
-        {[7, 8, 11, 12, 23, 24].map((index) => {
+        {[7, 8, 11, 12, 23, 24, 25, 26, 27, 28].map((index) => {
           const point = visible.get(index);
           if (!point) return null;
           return <Circle key={index} cx={point.x} cy={point.y} r={0.012} fill={color} />;

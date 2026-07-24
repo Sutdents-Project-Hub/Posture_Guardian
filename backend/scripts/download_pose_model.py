@@ -1,4 +1,4 @@
-"""Download and verify the pinned MediaPipe Pose Landmarker Lite task bundle."""
+"""Download and verify the pinned MediaPipe Pose Landmarker Full task bundle."""
 
 import hashlib
 import time
@@ -7,11 +7,11 @@ from urllib.request import urlopen
 
 MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
-    "pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+    "pose_landmarker_full/float16/1/pose_landmarker_full.task"
 )
-MODEL_SHA256 = "59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a"
+MODEL_SHA256 = "5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1"
 API_ROOT = Path(__file__).resolve().parents[1]
-TARGET = API_ROOT / "models" / "pose_landmarker_lite.task"
+TARGET = API_ROOT / "models" / "pose_landmarker_full.task"
 
 
 def main() -> None:

@@ -7,19 +7,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandMark } from '@/components/brand-mark';
 import { ImprovementTrend } from '@/components/improvement-trend';
 import { SessionHistoryCard } from '@/components/session-history-card';
+import { WeeklyReportCard } from '@/components/weekly-report-card';
 import { Surface } from '@/components/ui/surface';
 import { useAppContext } from '@/context/app-context';
 import { Radius, Spacing, Typography, type ThemePalette } from '@/constants/design';
 import { useAppTheme, useThemedStyles } from '@/hooks/use-app-theme';
-import { getSessions } from '@/lib/api';
+import { getSessions, getWeeklyReport } from '@/lib/api';
 import { buildPostureTrend, TREND_SAMPLE_SIZE } from '@/lib/trends';
-import type { SessionSummary } from '@/types/posture';
+import type { SessionSummary, WeeklyReport } from '@/types/posture';
 
 export default function HistoryScreen() {
   const { palette } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const { account, ready } = useAppContext();
   const [items, setItems] = useState<SessionSummary[]>([]);
+  const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -30,10 +32,19 @@ export default function HistoryScreen() {
       if (refresh) setRefreshing(true);
       else setLoading(true);
       try {
-        setItems(account ? await getSessions() : []);
-        setOffline(false);
-      } catch {
-        setOffline(true);
+        if (!account) {
+          setItems([]);
+          setWeeklyReport(null);
+          setOffline(false);
+          return;
+        }
+        const [sessionsResult, reportResult] = await Promise.allSettled([
+          getSessions(),
+          getWeeklyReport(),
+        ]);
+        setItems(sessionsResult.status === 'fulfilled' ? sessionsResult.value : []);
+        setWeeklyReport(reportResult.status === 'fulfilled' ? reportResult.value : null);
+        setOffline(sessionsResult.status === 'rejected' || reportResult.status === 'rejected');
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -96,6 +107,7 @@ export default function HistoryScreen() {
                 <MaterialIcons name="insights" size={34} color={palette.primary} />
               </View>
             </Surface>
+            <WeeklyReportCard report={weeklyReport} />
             <Surface style={styles.trendCard}>
               <View style={styles.trendHeading}>
                 <View style={styles.trendTitleCopy}>

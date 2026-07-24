@@ -5,13 +5,14 @@
 - 最小蒐集：能用衍生角度完成，就不保存照片、影片或臉部資訊。
 - 目的限制：資料只用於姿勢覺察、趨勢與使用者要求的建議。
 - 清楚同意：相機、測試資料與聯絡人通知分開同意，預設關閉非必要功能。
+- 可見範圍：房間模式只分析使用者主動架設鏡頭後的單人支援區；不做人臉辨識、旁人識別或隱蔽監控。
 - 非醫療：不輸出診斷、疾病風險或治療指示；身體不適應尋求家長、教師或專業人員協助。
 
 ## 目前 MVP 的真實狀態
 
 - 使用者可用 Email 與至少 12 字元密碼註冊／登入；只保存正規化 Email 與 Argon2 password hash，不收集姓名、學校或聯絡人。
 - 登入採 14 天（可設 1–30 天）的隨機 opaque bearer session；server 只保存 token 的 SHA-256 digest，登出會立即刪除目前 session。每個工作階段都依登入帳號檢查 ownership。
-- 相機影格以 multipart 暫存送到 API，限制 image MIME、5 MB 與 1,200 萬像素；推論完成即釋放。
+- 相機影格以 multipart 暫存送到 API，限制 image MIME、5 MB 與 1,200 萬像素；MediaPipe Full 推論、單人／距離／截斷品質檢查完成即釋放。
 - 資料庫只保存衍生角度、事件與摘要；設定頁可刪除該 profile 的伺服器資料。
 - 量界智算只接收至少 10 分鐘工作階段的去識別彙總；API key 只存在 backend／Coolify runtime secret，設定不足時服務拒絕冒充已啟用。
 - 量界智算的資料區域、保存、訓練與未成年條款尚未由正式文件確認；確認前不傳原始影像、自由文字或直接識別資訊。
@@ -22,6 +23,8 @@
 | 風險 | 控制 |
 |---|---|
 | 相機畫面外洩 | 預設不保存；不寫 log；請求完成即釋放；展示時避免拍到旁人 |
+| 房間模式拍到旁人 | 使用前清楚告知支援區；只允許單一主要人體，多人入鏡即拒絕分析；不做人臉辨識或跨畫面追蹤；展示與測試需取得在場者同意 |
+| 過遠或截斷造成錯判 | 人物過小、多人、必要節點出框、視角不明或 coverage 不完整時回傳無效與品質原因，不用低品質資料產生提醒 |
 | 前端 secret 外洩 | `EXPO_PUBLIC_*` 只放公開設定；AI key、DB 密碼只在 API／部署平台 |
 | 未成年資料被過度蒐集 | 只收 Email 作登入；正式公開前應補足年齡／監護人同意流程，聯絡人功能仍預設關閉 |
 | 聯絡人變成監控 | 預設關閉，只傳摘要，不傳即時影像；可查看收件人與撤回 |
@@ -33,9 +36,11 @@
 ## 相機與上傳規則
 
 - 權限前先說明用途與是否離開裝置／瀏覽器。
+- 房間模式啟用前說明鏡頭可見支援區、單人限制與多人拒絕行為；避免鏡頭涵蓋走廊、其他學生座位或非參與者區域。
 - 畫面只取完成姿態推論所需解析度與頻率。
 - API 已限制 image MIME、5 MB 與 1,200 萬像素，client 請求有 8 秒 timeout；API 正常處理的回應另帶 `Cache-Control: no-store`、`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、關閉 camera／microphone／geolocation 的 `Permissions-Policy`，以及 `X-Robots-Tag: noindex, nofollow`。這些 browser-level defaults 不取代 production reverse proxy 的 request timeout、body limit、依 endpoint 區分的 rate limit 或 access control。
 - 原始影格不可傳送給生成式 AI provider。
+- API 可回傳 `pose_count`、`subject_scale`、距離、截斷與品質原因供畫面提示，但不得用這些欄位建立人臉身分、長期位置軌跡或旁人檔案。
 - debug 模式也不得把 base64 或可還原影像的資料寫入 log；API 回傳 landmarks 供即時 overlay，但資料庫不保存 landmarks 全量。
 
 ## 帳號與聯絡人
@@ -54,5 +59,6 @@
 - [ ] client bundle 不含 AI／資料庫 secret。
 - [ ] API error 不回傳 stack trace、prompt、connection string 或 provider response 原文。
 - [ ] demo 帳號、簡報截圖與 log 已去識別。
+- [ ] 房間模式已在實際支援區驗證多人、過遠、出框與遮擋都會拒絕，且未錄到未同意旁人。
 - [ ] 資料刪除與同意撤回流程有人工驗收。
 - [ ] 若服務可由公開網路存取，已使用 Coolify／反向代理存取控制保護 demo API；正式多使用者版另有身份、ownership 與 rate limit。

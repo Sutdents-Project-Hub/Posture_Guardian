@@ -9,10 +9,42 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, mo
 
 
 class ViewMode(StrEnum):
-    """Supported camera viewpoints."""
+    """Resolved camera viewpoints supported by posture rules."""
 
     SIDE = "side"
     FRONT = "front"
+
+
+class RequestedViewMode(StrEnum):
+    """Viewpoint requested by the client before automatic resolution."""
+
+    AUTO = "auto"
+    SIDE = "side"
+    FRONT = "front"
+
+
+class CoverageMode(StrEnum):
+    """Body coverage that can be evaluated from the current frame."""
+
+    UPPER_BODY = "upper_body"
+    FULL_BODY = "full_body"
+
+
+class DistanceBand(StrEnum):
+    """Coarse, non-metric camera-distance guidance derived from body scale."""
+
+    NEAR = "near"
+    RECOMMENDED = "recommended"
+    FAR = "far"
+    UNKNOWN = "unknown"
+
+
+class FramingStatus(StrEnum):
+    """Whether the detected subject is safely inside the image."""
+
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    OUT_OF_FRAME = "out_of_frame"
 
 
 class InterventionStage(StrEnum):
@@ -37,7 +69,9 @@ class Landmark(BaseModel):
 class AnalysisResponse(BaseModel):
     """Pose metrics produced from one transient image."""
 
-    view_mode: ViewMode
+    view_mode: ViewMode | None
+    requested_view_mode: RequestedViewMode
+    coverage_mode: CoverageMode
     valid: bool
     quality: float
     status: Literal["calibrating", "good", "attention", "invalid"]
@@ -48,6 +82,13 @@ class AnalysisResponse(BaseModel):
     reasons: list[str]
     landmarks: list[Landmark]
     selected_side: Literal["left", "right"] | None = None
+    image_width: int
+    image_height: int
+    pose_count: int
+    subject_scale: float
+    distance: DistanceBand
+    framing: FramingStatus
+    quality_issues: list[str] = Field(default_factory=list)
     message: str
 
 
@@ -83,18 +124,33 @@ class AuthSessionResponse(BaseModel):
 class SessionCreate(StrictInputModel):
     """Create a calibrated work session."""
 
-    view_mode: ViewMode
+    view_mode: RequestedViewMode
+    coverage_mode: CoverageMode = CoverageMode.UPPER_BODY
+    room_mode: bool = False
     intervention_stage: InterventionStage = InterventionStage.STARTER
-    baseline: dict[str, float]
+    baseline: dict[str, float] = Field(min_length=1, max_length=8)
 
     @model_validator(mode="after")
     def validate_baseline(self) -> Self:
-        expected = {
+        upper_metrics = {
             ViewMode.SIDE: {"neck_flexion", "trunk_flexion"},
             ViewMode.FRONT: {"head_tilt", "shoulder_tilt", "trunk_lateral"},
-        }[self.view_mode]
-        if set(self.baseline) != expected:
-            raise ValueError("baseline 欄位與所選視角不一致")
+        }
+        full_metrics = {
+            ViewMode.SIDE: {"knee_flexion"},
+            ViewMode.FRONT: {"hip_tilt", "knee_tilt"},
+        }
+        if self.view_mode is RequestedViewMode.AUTO:
+            allowed = set().union(*upper_metrics.values())
+            if self.coverage_mode is CoverageMode.FULL_BODY:
+                allowed.update(*full_metrics.values())
+        else:
+            resolved = ViewMode(self.view_mode.value)
+            allowed = set(upper_metrics[resolved])
+            if self.coverage_mode is CoverageMode.FULL_BODY:
+                allowed.update(full_metrics[resolved])
+        if not set(self.baseline).issubset(allowed):
+            raise ValueError("baseline 欄位與所選視角或身體範圍不一致")
         if any(not math.isfinite(value) or abs(value) > 180 for value in self.baseline.values()):
             raise ValueError("baseline 角度必須是 -180 到 180 的有限數字")
         return self
@@ -114,6 +170,7 @@ class SampleCreate(StrictInputModel):
     is_valid: bool
     threshold_exceeded: bool = False
     event_active: bool = False
+    reminder_triggered: bool = False
     posture_score: Annotated[float, Field(ge=0, le=100)] = 0
     metrics: dict[str, float] = Field(default_factory=dict)
     deviations: dict[str, float] = Field(default_factory=dict)
@@ -152,14 +209,19 @@ class SessionSummary(BaseModel):
     """Completed session summary used by dashboard and history screens."""
 
     id: str
-    view_mode: ViewMode
+    view_mode: RequestedViewMode
+    coverage_mode: CoverageMode = CoverageMode.UPPER_BODY
+    room_mode: bool = False
     intervention_stage: InterventionStage
     started_at: datetime
     ended_at: datetime | None
     valid_seconds: float
     good_seconds: float
+    attention_seconds: float = 0
+    poor_seconds: float = 0
     invalid_seconds: float
     posture_event_count: int
+    reminder_count: int = 0
     average_score: float
     good_posture_rate: float
     primary_issue: str | None
@@ -179,6 +241,49 @@ class SessionList(BaseModel):
     """Recent session history for one anonymous local profile."""
 
     items: list[SessionSummary]
+
+
+class WeeklyStatusDistribution(BaseModel):
+    """Duration-weighted states for one weekly report."""
+
+    good_seconds: float
+    attention_seconds: float
+    poor_seconds: float
+    invalid_seconds: float
+
+
+class WeeklyTimePeriod(BaseModel):
+    """One local-time bucket in a weekly posture report."""
+
+    period: Literal["overnight", "morning", "afternoon", "evening"]
+    label: str
+    valid_seconds: float
+    good_seconds: float
+    attention_seconds: float
+    poor_seconds: float
+    good_posture_rate: float
+    reminder_count: int
+
+
+class WeeklyReport(BaseModel):
+    """An authenticated, duration-weighted weekly posture summary."""
+
+    period_start: datetime
+    period_end: datetime
+    timezone: str
+    session_count: int
+    valid_seconds: float
+    good_seconds: float
+    attention_seconds: float
+    poor_seconds: float
+    invalid_seconds: float
+    good_posture_rate: float
+    reminder_count: int
+    status_distribution: WeeklyStatusDistribution
+    time_periods: list[WeeklyTimePeriod]
+    primary_issue: str | None
+    insight_text: str
+    insight_provider: Literal["liangjie", "fallback"]
 
 
 class DeleteResponse(BaseModel):

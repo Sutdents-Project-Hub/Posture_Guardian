@@ -2,14 +2,16 @@ import { Platform } from 'react-native';
 
 import type {
   AnalysisResponse,
+  CoverageMode,
   HealthResponse,
   InterventionStage,
+  RequestedViewMode,
   ReminderFit,
   SessionCompleteResponse,
   SessionSample,
   SessionFeeling,
   SessionSummary,
-  ViewMode,
+  WeeklyReport,
 } from '@/types/posture';
 
 const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
@@ -115,7 +117,7 @@ async function imagePart(uri: string): Promise<Blob | { uri: string; name: strin
 
 export async function analyzePosture(
   imageUri: string,
-  viewMode: ViewMode,
+  viewMode: RequestedViewMode,
   baseline?: Record<string, number>,
 ): Promise<AnalysisResponse> {
   const form = new FormData();
@@ -131,7 +133,9 @@ export async function analyzePosture(
 }
 
 export async function createSession(payload: {
-  view_mode: ViewMode;
+  view_mode: RequestedViewMode;
+  coverage_mode: CoverageMode;
+  room_mode: boolean;
   intervention_stage: InterventionStage;
   baseline: Record<string, number>;
 }): Promise<{ id: string; started_at: string }> {
@@ -168,6 +172,10 @@ export async function submitSessionFeedback(
 export async function getSessions(): Promise<SessionSummary[]> {
   const result = await request<{ items: SessionSummary[] }>('/api/v1/sessions?limit=30');
   return result.items;
+}
+
+export async function getWeeklyReport(timezone = 'Asia/Taipei'): Promise<WeeklyReport> {
+  return request<WeeklyReport>(`/api/v1/reports/weekly?timezone=${encodeURIComponent(timezone)}`);
 }
 
 export async function deleteAccountData(): Promise<number> {

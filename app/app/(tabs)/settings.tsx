@@ -171,21 +171,28 @@ export default function SettingsScreen() {
         })}
       </View>
 
-      <Text style={styles.sectionTitle}>回饋方式</Text>
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>回饋方式</Text>
+        <StatusPill label={hapticsEnabled ? '視覺＋震動' : '安靜模式'} tone="info" />
+      </View>
       <Surface style={styles.settingRow}>
         <View style={styles.settingIcon}>
-          <MaterialIcons name="vibration" size={24} color={palette.primary} />
+          <MaterialIcons name={hapticsEnabled ? 'vibration' : 'volume-off'} size={24} color={palette.primary} />
         </View>
         <View style={styles.settingCopy}>
-          <Text style={styles.settingTitle}>手機震動提醒</Text>
-          <Text style={styles.settingText}>Web 不支援時只顯示視覺提示；不會使用令人疼痛的硬體按壓。</Text>
+          <Text style={styles.settingTitle}>安靜模式</Text>
+          <Text style={styles.settingText}>
+            {hapticsEnabled
+              ? '已關閉安靜模式；進階與加強階段會搭配手機震動，畫面仍會顯示原因。'
+              : '只顯示畫面內的溫和提示，適合考試、自習或專注期間；不播放聲音。'}
+          </Text>
         </View>
         <Switch
-          accessibilityLabel="手機震動提醒"
-          value={hapticsEnabled}
-          onValueChange={(value) => void setHapticsEnabled(value)}
+          accessibilityLabel="安靜模式"
+          value={!hapticsEnabled}
+          onValueChange={(value) => void setHapticsEnabled(!value)}
           trackColor={{ false: palette.line, true: palette.primaryPale }}
-          thumbColor={hapticsEnabled ? palette.primary : palette.inkSoft}
+          thumbColor={!hapticsEnabled ? palette.primary : palette.inkSoft}
         />
       </Surface>
 
